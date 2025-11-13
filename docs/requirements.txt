@@ -4,3 +4,6 @@
 # sphinx_rtd_theme
 myst-parser[linkify]
 sphinx>=3.2.1
+sphinx_book_theme
+sphinx_copybutton
+sphinx_design
