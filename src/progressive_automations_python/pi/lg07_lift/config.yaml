@@ -1,0 +1,22 @@
+# Configuration for LG-07 Lift Control
+# GPIO pin assignments (BCM numbering)
+gpio:
+  pin_up: 17      # GPIO pin for UP relay
+  pin_down: 27    # GPIO pin for DOWN relay
+
+# Timing settings (seconds)
+timing:
+  default_press_time: 1.0    # Default movement time
+  nudge_time: 0.2           # Default nudge time
+  min_press_time: 0.1       # Minimum allowed press time
+  max_press_time: 10.0      # Maximum allowed press time
+
+# Safety settings
+safety:
+  enable_emergency_stop: true
+  auto_cleanup: true
+
+# Debug settings
+debug:
+  enable_logging: false
+  log_level: INFO

@@ -1,0 +1,6 @@
+# Raspberry Pi specific requirements for LG-07 lift control
+# Install with: pip install -r requirements-pi.txt
+
+RPi.GPIO>=0.7.0
+# Note: RPi.GPIO is only available on Raspberry Pi
+# On other systems, use the test_basic.py script with mocked GPIO
