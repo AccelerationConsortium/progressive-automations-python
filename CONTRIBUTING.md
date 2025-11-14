@@ -320,15 +320,16 @@ on [PyPI], the following steps can be used to release a new version for
 2. Tag the current commit on the main branch with a release tag, e.g., `v1.2.3`.
 3. Push the new tag to the upstream [repository],
    e.g., `git push upstream v1.2.3`
-4. Clean up the `dist` and `build` folders with `tox -e clean`
-   (or `rm -rf dist build`)
-   to avoid confusion with old builds and Sphinx docs.
+4. Clean up previous build artifacts with `tox -e clean`
+   (or `rm -rf dist build`) so the new distributions are easy to inspect.
 5. Run `tox -e build` and check that the files in `dist` have
    the correct version (no `.dirty` or [git] hash) according to the [git] tag.
-   Also check the sizes of the distributions, if they are too big (e.g., >
-   500KB), unwanted clutter may have been accidentally included.
-6. Run `tox -e publish -- --repository pypi` and check that everything was
-   uploaded to [PyPI] correctly.
+   Follow up with `pipx run twine check dist/*` if you want to verify the
+   metadata locally; this mirrors the validation performed in CI.
+6. After the tag push GitHub Actions will trigger the `tests` workflow.
+   The workflow's `publish` job uploads the distributions to [PyPI] using the
+   trusted publisher integration—no API tokens required. Monitor that run to
+   confirm the release succeeded.
 
 [^contrib1]: Even though, these resources focus on open source projects and
     communities, the general ideas behind collaborating with other developers

@@ -24,6 +24,7 @@ Contributions & Help <contributing>
 License <license>
 Authors <authors>
 Changelog <changelog>
+Bill of Materials <bill_of_materials>
 Module Reference <api/modules>
 ```
 
