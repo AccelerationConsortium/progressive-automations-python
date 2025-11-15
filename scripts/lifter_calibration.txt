@@ -1,0 +1,15 @@
+# Desk Lifter Calibration Data
+
+Lowest height: 23.7 inches
+Highest height: 54.5 inches
+
+Down movement rate: 0.55 inches/second (measured from 54.5" to 49" in 10s)
+Up movement rate: 0.55 inches/second (measured from 23.7" to 29.1" in 10s)
+
+Calibration measurements:
+- Down 10s: 54.5" → 49.0"
+- Up 10s: 23.7" → 29.1"
+
+Notes:
+- Use these rates to estimate time needed to reach a target height from the lowest position.
+- Rates may vary slightly; repeat measurements for higher accuracy if needed.
