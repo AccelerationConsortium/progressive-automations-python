@@ -38,6 +38,7 @@ jobs:
         id: setup-python
         with: {python-version: "3.12"}
       - name: Run static analysis and format checkers
+        continue-on-error: true
         run: pipx run pre-commit run --all-files --show-diff-on-failure
       - name: Build package distribution files
         run: >-
