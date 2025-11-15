@@ -18,6 +18,12 @@
 
 A longer description of your project goes here...
 
+## Setup
+
+For Raspberry Pi 5 setup instructions, see [docs/raspberry-pi-setup.md](docs/raspberry-pi-setup.md).
+
+For bill of materials, see [docs/bill_of_materials.md](docs/bill_of_materials.md).
+
 
 <!-- pyscaffold-notes -->
 

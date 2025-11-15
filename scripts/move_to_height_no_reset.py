@@ -41,8 +41,12 @@ def save_state(state):
     with open(STATE_FILE, 'w') as f:
         json.dump(state, f, indent=2)
 
-def move_to_height(target_height, current_height):
+def move_to_height(target_height, current_height=None):
     state = load_state()
+    if current_height is None:
+        if state["last_position"] is None:
+            raise ValueError("Current height unknown. Please provide current height.")
+        current_height = state["last_position"]
     if not (LOWEST_HEIGHT <= target_height <= HIGHEST_HEIGHT):
         raise ValueError(f"Target height {target_height}'' is out of range.")
     delta = target_height - current_height
@@ -75,9 +79,11 @@ def move_to_height(target_height, current_height):
 
 if __name__ == "__main__":
     try:
-        current = float(input(f"Enter current height in inches ({LOWEST_HEIGHT}-{HIGHEST_HEIGHT}): "))
+        # current = float(input(f"Enter current height in inches ({LOWEST_HEIGHT}-{HIGHEST_HEIGHT}): "))
+        state = load_state()
+        print(state)
         target = float(input(f"Enter target height in inches ({LOWEST_HEIGHT}-{HIGHEST_HEIGHT}): "))
-        move_to_height(target, current)
+        move_to_height(target)
     finally:
         release_up()
         release_down()
