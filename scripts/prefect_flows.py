@@ -1,29 +1,64 @@
 """
-Prefect flows and deployments for automated desk control.
+Simplified Prefect flows for automated desk control.
 
 Provides scheduled automation and workflow orchestration using Prefect.
-Integrates with the desk controller for safe, automated movements.
+Uses the comprehensive desk_controller.execute_custom_movements() function.
 """
 
 import time
+import os
+import sys
 from prefect import flow, task
 from prefect.logging import get_run_logger
 
-# Import our modular components
-from desk_controller import move_to_height, test_sequence, LOWEST_HEIGHT
+# Add the scripts directory to Python path for imports
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+# Import our modular components  
+from desk_controller import (
+    move_to_height, 
+    test_sequence, 
+    LOWEST_HEIGHT,
+    execute_custom_movements,
+    check_duty_cycle_status_before_execution
+)
+from duty_cycle import show_duty_cycle_status, get_duty_cycle_status, load_state
 
 
 @task
 def log_info(message: str):
     """Log information message"""
-    logger = get_run_logger()
-    logger.info(message)
     print(message)
+
+
+@task
+def duty_cycle_status_task():
+    """
+    Check duty cycle status as a Prefect task.
+    Reuses existing check_duty_cycle_status_before_execution() from desk_controller.
+    """
+    logger = get_run_logger()
+    
+    try:
+        # Use the existing function - no need to reimplement
+        status = check_duty_cycle_status_before_execution()
+        
+        # Log for Prefect monitoring
+        logger.info(f"Duty cycle check completed:")
+        logger.info(f"  Usage: {status['current_usage']:.1f}s / 120s ({status['percentage_used']:.1f}%)")
+        logger.info(f"  Remaining: {status['remaining_capacity']:.1f}s")
+        logger.info(f"  Position: {status['current_position']}\"")
+        
+        return status
+        
+    except Exception as e:
+        logger.error(f"Failed to check duty cycle status: {e}")
+        raise
 
 
 @task  
 def execute_movement(target_height: float, current_height: float = None):
-    """Execute a movement as a Prefect task"""
+    """Execute a single movement as a Prefect task"""
     logger = get_run_logger()
     
     try:
@@ -38,6 +73,37 @@ def execute_movement(target_height: float, current_height: float = None):
             
     except Exception as e:
         logger.error(f"Movement execution failed: {e}")
+        raise
+
+
+@task
+def execute_custom_movements_task(config_file: str = "movement_configs.json"):
+    """
+    Execute custom movements from configuration file as a Prefect task.
+    
+    This is a thin wrapper around desk_controller.execute_custom_movements()
+    which already handles all the complexity:
+    - Loading movement configs
+    - Pre-execution duty cycle checking  
+    - Movement validation
+    - Movement execution
+    - Post-execution status reporting
+    """
+    logger = get_run_logger()
+    logger.info(f"Executing custom movements from {config_file}")
+    
+    try:
+        # This function does EVERYTHING - no need for separate loading/validation tasks
+        result = execute_custom_movements(config_file)
+        
+        if result["success"]:
+            logger.info(f"✅ All movements completed successfully ({result['successful']}/{result['total_movements']})")
+        else:
+            logger.info(f"⚠️ Movements completed with some failures ({result['failed']}/{result['total_movements']} failed)")
+            
+        return result
+    except Exception as e:
+        logger.error(f"❌ Custom movements execution failed: {e}")
         raise
 
 
@@ -61,116 +127,242 @@ def execute_test_sequence(movement_distance: float = 0.5, rest_time: float = 10.
         raise
 
 
+# =============================================================================
+# FLOWS
+# =============================================================================
+
 @flow
-def move_to_height_flow(target_height: float, current_height: float = None):
-    """Prefect flow for moving to a specific height"""
-    log_info(f"Starting movement flow: target={target_height}, current={current_height}")
+def simple_movement_flow(target_height: float, current_height: float = None):
+    """Simple Prefect flow for moving to a specific height with duty cycle checking"""
+    logger = get_run_logger()
+    logger.info(f"=== SIMPLE MOVEMENT FLOW ===")
+    logger.info(f"Target: {target_height}\", Current: {current_height}\"")
     
+    # Check duty cycle status using existing function
+    initial_status = duty_cycle_status_task()
+    
+    # Abort if insufficient capacity
+    if initial_status["remaining_capacity"] < 1.0:
+        logger.error("❌ MOVEMENT ABORTED: Insufficient duty cycle capacity")
+        raise ValueError("Insufficient duty cycle capacity - must wait for reset")
+    
+    # Execute the movement
     result = execute_movement(target_height, current_height)
     
-    log_info(f"Movement flow completed: {result}")
-    return result
-
-
-@flow  
-def custom_test_sequence_flow(movement_distance: float = 0.5, rest_time: float = 10.0):
-    """Prefect flow for custom test sequence"""
-    log_info(f"Starting test sequence: distance={movement_distance}, rest={rest_time}")
+    # Check final duty cycle status
+    final_status = duty_cycle_status_task()
     
-    start_height = LOWEST_HEIGHT
-    up_target = start_height + movement_distance
-    
-    log_info(f"Test sequence plan:")
-    log_info(f"  Starting at: {start_height}\"")
-    log_info(f"  Will move to: {up_target}\"")
-    log_info(f"  Then rest for {rest_time} seconds")
-    log_info(f"  Then return to: {start_height}\"")
-    
-    # Phase 1: Move up
-    log_info(f"--- Phase 1: Moving UP {movement_distance} inches ---")
-    result1 = execute_movement(up_target, start_height)
-    
-    # Phase 2: Rest
-    log_info(f"--- Phase 2: Resting for {rest_time} seconds ---")
-    time.sleep(rest_time)
-    log_info("Rest complete.")
-    
-    # Phase 3: Move down  
-    log_info(f"--- Phase 3: Moving DOWN {movement_distance} inches ---")
-    result2 = execute_movement(start_height, up_target)
-    
-    log_info("Custom test sequence complete!")
+    # Log usage
+    capacity_used = initial_status["remaining_capacity"] - final_status["remaining_capacity"]
+    logger.info(f"Movement completed - Duty cycle used: {capacity_used:.1f}s")
     
     return {
-        "success": True,
-        "phase1_result": result1,
-        "phase2_result": result2,
-        "total_duration": result1.get("duration", 0) + result2.get("duration", 0)
+        **result,
+        "initial_duty_status": initial_status,
+        "final_duty_status": final_status,
+        "capacity_used": capacity_used
     }
 
 
 @flow
-def desk_control_cli_flow():
-    """Prefect flow for CLI-based desk control"""
-    log_info("Starting CLI flow")
+def custom_movements_flow(config_file: str = "movement_configs.json"):
+    """
+    Simplified Prefect flow to execute custom movements.
     
-    try:
-        from desk_controller import LOWEST_HEIGHT, HIGHEST_HEIGHT
-        
-        current = float(input(f"Enter current height in inches ({LOWEST_HEIGHT}-{HIGHEST_HEIGHT}): "))
-        target = float(input(f"Enter target height in inches ({LOWEST_HEIGHT}-{HIGHEST_HEIGHT}): "))
-        
-        result = execute_movement(target, current)
-        log_info("CLI flow completed successfully!")
-        return result
-        
-    except ValueError as e:
-        log_info(f"Error: {e}")
-        raise
-    except KeyboardInterrupt:
-        log_info("Operation cancelled.")
-        raise
+    Uses the comprehensive desk_controller.execute_custom_movements() function
+    which already includes all necessary features internally.
+    """
+    logger = get_run_logger()
+    logger.info("=== CUSTOM MOVEMENTS FLOW ===")
+    
+    # Execute custom movements - this function already does all the duty cycle checking
+    result = execute_custom_movements_task(config_file)
+    
+    logger.info("Custom movements flow completed")
+    return result
 
 
-def deploy_test_sequence(schedule_cron: str = "39 4 * * *", deployment_name: str = "desk-lifter-test-sequence-1139pm-toronto"):
-    """Deploy the test sequence with scheduling"""
+@flow
+def duty_cycle_monitoring_flow():
+    """
+    Simplified duty cycle monitoring flow.
+    Uses existing duty cycle checking functions.
+    """
+    logger = get_run_logger()
+    logger.info("=== DUTY CYCLE MONITORING FLOW ===")
     
-    custom_test_sequence_flow.from_source(
+    # Use existing duty cycle status function
+    status = duty_cycle_status_task()
+    
+    # Simple recommendation logic
+    remaining = status["remaining_capacity"]
+    
+    if remaining < 5:
+        recommendation = "wait"
+        logger.warning("⚠️ VERY LOW CAPACITY - Recommend waiting for duty cycle reset")
+    elif remaining < 15:
+        recommendation = "small_movements_only"
+        logger.warning("⚠️ LOW CAPACITY - Use small movements only")
+    elif remaining < 60:
+        recommendation = "moderate_planning"
+        logger.info("✅ MODERATE CAPACITY - Plan movements carefully")
+    else:
+        recommendation = "normal_operations"
+        logger.info("✅ GOOD CAPACITY - Normal operations possible")
+    
+    return {
+        "status": status,
+        "recommendation": recommendation,
+        "operational_mode": recommendation
+    }
+
+
+@flow
+def scheduled_duty_cycle_check():
+    """
+    Scheduled duty cycle monitoring using existing functions.
+    Just wraps duty_cycle_monitoring_flow for scheduled execution.
+    """
+    logger = get_run_logger()
+    logger.info("=== SCHEDULED DUTY CYCLE CHECK ===")
+    
+    # Use the monitoring flow
+    result = duty_cycle_monitoring_flow()
+    
+    # Log summary for scheduled monitoring
+    status = result["status"]
+    logger.info(f"Scheduled duty cycle check:")
+    logger.info(f"  Usage: {status['current_usage']:.1f}s / 120s ({status['percentage_used']:.1f}%)")
+    logger.info(f"  Mode: {result['recommendation']}")
+    
+    # Alert on very low capacity
+    if status["remaining_capacity"] < 10:
+        logger.warning("🚨 ALERT: Very low duty cycle capacity remaining!")
+    
+    return result
+
+
+@flow  
+def test_sequence_flow(movement_distance: float = 0.5, rest_time: float = 10.0):
+    """Prefect flow for automated test sequence"""
+    logger = get_run_logger()
+    logger.info(f"=== TEST SEQUENCE FLOW ===")
+    logger.info(f"Distance: {movement_distance}\", Rest: {rest_time}s")
+    
+    # Check duty cycle before starting using existing function
+    initial_status = duty_cycle_status_task()
+    
+    # Execute test sequence
+    result = execute_test_sequence(movement_distance, rest_time)
+    
+    # Check final status
+    final_status = duty_cycle_status_task()
+    
+    logger.info("Test sequence flow completed")
+    return {
+        **result,
+        "initial_duty_status": initial_status,
+        "final_duty_status": final_status
+    }
+
+
+# =============================================================================
+# DEPLOYMENT FUNCTIONS
+# =============================================================================
+
+def deploy_custom_movements_flow(deployment_name: str = "custom-movements"):
+    """Deploy the main custom movements flow"""
+    
+    deployment = custom_movements_flow.from_source(
         source=".",
-        entrypoint="prefect_flows.py:custom_test_sequence_flow",
-    ).deploy(
-        name=deployment_name,
-        work_pool_name="default-agent-pool", 
-        cron=schedule_cron,  # Default: Run daily at 11:39 PM Toronto time (4:39 AM UTC)
-    )
-    
-    print(f"Deployment '{deployment_name}' created with schedule '{schedule_cron}'!")
-    print("Run 'prefect worker start --pool default-agent-pool' to execute scheduled flows.")
-
-
-def deploy_test_sequence_immediate(deployment_name: str = "desk-lifter-test-immediate"):
-    """Deploy the test sequence without scheduling for immediate execution"""
-    
-    deployment = custom_test_sequence_flow.from_source(
-        source=".",
-        entrypoint="prefect_flows.py:custom_test_sequence_flow",
+        entrypoint="prefect_flows.py:custom_movements_flow",
     ).deploy(
         name=deployment_name,
         work_pool_name="default-process-pool",
-        # No cron schedule - runs on demand only
     )
     
-    print(f"Deployment '{deployment_name}' created for immediate execution!")
-    print(f"To run immediately: prefect deployment run 'custom-test-sequence-flow/{deployment_name}'")
+    print(f"✅ Deployment '{deployment_name}' created!")
+    print(f"To run: prefect deployment run 'custom-movements-flow/{deployment_name}'")
     return deployment_name
+
+
+def deploy_duty_cycle_monitoring(deployment_name: str = "duty-cycle-monitor", schedule_cron: str = None):
+    """Deploy duty cycle monitoring flow with optional scheduling"""
+    
+    deploy_kwargs = {
+        "name": deployment_name,
+        "work_pool_name": "default-process-pool",
+    }
+    
+    if schedule_cron:
+        from prefect.client.schemas.schedules import CronSchedule
+        deploy_kwargs["schedule"] = CronSchedule(cron=schedule_cron)
+        print(f"Deploying with cron schedule: {schedule_cron}")
+    
+    deployment = scheduled_duty_cycle_check.from_source(
+        source=".",
+        entrypoint="prefect_flows.py:scheduled_duty_cycle_check",
+    ).deploy(**deploy_kwargs)
+    
+    print(f"✅ Deployment '{deployment_name}' created!")
+    if schedule_cron:
+        print(f"Scheduled to run: {schedule_cron}")
+    else:
+        print(f"To run: prefect deployment run 'scheduled-duty-cycle-check/{deployment_name}'")
+    return deployment_name
+
+
+def deploy_test_sequence(deployment_name: str = "test-sequence"):
+    """Deploy test sequence flow"""
+    
+    deployment = test_sequence_flow.from_source(
+        source=".",
+        entrypoint="prefect_flows.py:test_sequence_flow",
+    ).deploy(
+        name=deployment_name,
+        work_pool_name="default-process-pool",
+    )
+    
+    print(f"✅ Deployment '{deployment_name}' created!")
+    print(f"To run: prefect deployment run 'test-sequence-flow/{deployment_name}'")
+    return deployment_name
+
+
+def deploy_all_flows():
+    """Deploy all desk control flows"""
+    print("=== DEPLOYING ALL SIMPLIFIED DESK CONTROL FLOWS ===")
+    
+    # Deploy main flows
+    deploy_custom_movements_flow()
+    deploy_test_sequence()
+    
+    # Deploy monitoring flows
+    deploy_duty_cycle_monitoring("duty-cycle-monitor-scheduled", "*/10 * * * *")
+    deploy_duty_cycle_monitoring("duty-cycle-monitor-immediate")
+    
+    print("\n🎉 All deployments created!")
+    print("\nAvailable flows:")
+    print("  1. custom-movements - Main movement execution")
+    print("  2. test-sequence - Automated test sequence")
+    print("  3. duty-cycle-monitor-scheduled - Auto monitoring (every 10min)")
+    print("  4. duty-cycle-monitor-immediate - On-demand monitoring")
+    
+    return True
 
 
 if __name__ == "__main__":
     import sys
     
-    if len(sys.argv) > 1 and sys.argv[1] == "deploy":
-        deploy_test_sequence()
-    elif len(sys.argv) > 1 and sys.argv[1] == "test":
-        custom_test_sequence_flow()
+    if len(sys.argv) > 1:
+        if sys.argv[1] == "test":
+            test_sequence_flow()
+        elif sys.argv[1] == "movements":
+            custom_movements_flow()
+        elif sys.argv[1] == "monitor":
+            duty_cycle_monitoring_flow()
+        elif sys.argv[1] == "deploy":
+            deploy_all_flows()
+        else:
+            print("Usage: python prefect_flows.py [test|movements|monitor|deploy]")
     else:
-        desk_control_cli_flow()
+        custom_movements_flow()

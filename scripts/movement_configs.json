@@ -1,0 +1,74 @@
+{
+  "movements": [
+    {
+      "id": "step_01",
+      "description": "Step 1: 30.0->28.0\" (2in down, ~0.4s)",
+      "target_height": 28.0,
+      "current_height": 30.0,
+      "enabled": true
+    },
+    {
+      "id": "step_02",
+      "description": "Step 2: 28.0->26.0\" (2in down, ~0.4s)",
+      "target_height": 26.0,
+      "current_height": 28.0,
+      "enabled": true
+    },
+    {
+      "id": "step_03",
+      "description": "Step 3: 26.0->24.0\" (2in down, ~0.4s)",
+      "target_height": 24.0,
+      "current_height": 26.0,
+      "enabled": true
+    },
+    {
+      "id": "step_04",
+      "description": "Step 4: 24.0->22.0\" (2in down, ~0.4s)",
+      "target_height": 22.0,
+      "current_height": 24.0,
+      "enabled": true
+    },
+    {
+      "id": "step_05",
+      "description": "Step 5: 22.0->20.0\" (2in down, ~0.4s)",
+      "target_height": 20.0,
+      "current_height": 22.0,
+      "enabled": true
+    },
+    {
+      "id": "step_06",
+      "description": "Step 6: 20.0->18.0\" (2in down, ~0.4s)",
+      "target_height": 18.0,
+      "current_height": 20.0,
+      "enabled": true
+    },
+    {
+      "id": "step_07",
+      "description": "Step 7: 18.0->16.0\" (2in down, ~0.4s)",
+      "target_height": 16.0,
+      "current_height": 18.0,
+      "enabled": true
+    },
+    {
+      "id": "step_08",
+      "description": "Step 8: 16.0->14.0\" (2in down, ~0.4s)",
+      "target_height": 14.0,
+      "current_height": 16.0,
+      "enabled": true
+    },
+    {
+      "id": "step_09",
+      "description": "Step 9: 14.0->12.0\" (2in down, ~0.4s)",
+      "target_height": 12.0,
+      "current_height": 14.0,
+      "enabled": true
+    },
+    {
+      "id": "step_10",
+      "description": "Step 10: 12.0->10.0\" (2in down, ~0.4s)",
+      "target_height": 10.0,
+      "current_height": 12.0,
+      "enabled": true
+    }
+  ]
+}

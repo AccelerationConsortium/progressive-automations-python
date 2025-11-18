@@ -10,7 +10,7 @@ import json
 import os
 from constants import LOWEST_HEIGHT
 from datetime import datetime
-from typing import List, Tuple, Dict, Any
+from typing import List, Tuple, Dict, Any, Optional
 
 # Duty cycle constants
 DUTY_CYCLE_PERIOD = 1200  # 20 minutes in seconds
@@ -84,48 +84,99 @@ def get_current_duty_cycle_usage(state: Dict[str, Any]) -> float:
     return total_usage
 
 
-def get_remaining_duty_time(state: Dict[str, Any]) -> float:
-    """Get remaining duty cycle time in seconds"""
-    current_usage = get_current_duty_cycle_usage(state)
-    return max(0, DUTY_CYCLE_MAX_ON_TIME - current_usage)
-
-
 def record_usage_period(state: Dict[str, Any], start_time: float, end_time: float, duration: float) -> Dict[str, Any]:
     """Record a usage period in the duty cycle tracking"""
     state["usage_periods"].append([start_time, end_time, duration])
     return state
 
 
-def check_duty_cycle_limits(state: Dict[str, Any], required_time: float) -> Tuple[bool, Dict[str, Any], str]:
+def check_movement_against_duty_cycle(target_height: float, current_height: Optional[float] = None, up_rate: float = 4.8, down_rate: float = 4.8) -> dict:
     """
-    Check if the movement is within duty cycle limits using sliding window
+    Check if a movement to a target height would exceed duty cycle limits.
     
+    Args:
+        target_height: Target height in mm/inches
+        current_height: Current height (if None, loads from state)
+        up_rate: Movement rate upward (mm/s or inches/s)
+        down_rate: Movement rate downward (mm/s or inches/s)
+        
     Returns:
-        (is_valid, updated_state, info_message)
+        dict: {
+            "allowed": bool,
+            "error": str or None,
+            "estimated_duration": float,
+            "current_usage": float,
+            "remaining_capacity": float,
+            "movement_type": "UP" or "DOWN",
+            "distance": float
+        }
     """
-    # Clean old periods and get current usage
-    state = clean_old_usage_periods(state)
-    current_usage = get_current_duty_cycle_usage(state)
+    # Load current state
+    state = load_state()
+    
+    if current_height is None:
+        current_height = state.get("last_position", LOWEST_HEIGHT)
+    
+    # Calculate movement requirements
+    distance = abs(target_height - current_height)
+    movement_type = "UP" if target_height > current_height else "DOWN"
+    rate = up_rate if movement_type == "UP" else down_rate
+    
+    if distance == 0:
+        return {
+            "allowed": True,
+            "error": None,
+            "estimated_duration": 0.0,
+            "current_usage": get_current_duty_cycle_usage(state),
+            "remaining_capacity": DUTY_CYCLE_MAX_ON_TIME - get_current_duty_cycle_usage(state),
+            "movement_type": movement_type,
+            "distance": distance
+        }
+    
+    estimated_duration = distance / rate
     
     # Check continuous runtime limit
-    if required_time > MAX_CONTINUOUS_RUNTIME:
-        error_msg = f"Movement duration {required_time:.1f}s exceeds maximum continuous runtime of {MAX_CONTINUOUS_RUNTIME}s"
-        return False, state, error_msg
+    if estimated_duration > MAX_CONTINUOUS_RUNTIME:
+        return {
+            "allowed": False,
+            "error": f"Movement would take {estimated_duration:.1f}s, exceeding {MAX_CONTINUOUS_RUNTIME}s continuous runtime limit",
+            "estimated_duration": estimated_duration,
+            "current_usage": get_current_duty_cycle_usage(state),
+            "remaining_capacity": DUTY_CYCLE_MAX_ON_TIME - get_current_duty_cycle_usage(state),
+            "movement_type": movement_type,
+            "distance": distance
+        }
     
-    # Check if adding this movement would exceed the duty cycle limit
-    if current_usage + required_time > DUTY_CYCLE_MAX_ON_TIME:
-        remaining_time = DUTY_CYCLE_MAX_ON_TIME - current_usage
-        error_msg = f"Movement would exceed {DUTY_CYCLE_PERCENTAGE*100:.0f}% duty cycle limit. Current usage: {current_usage:.1f}s, Remaining: {remaining_time:.1f}s in {DUTY_CYCLE_PERIOD}s window"
-        return False, state, error_msg
+    # Check duty cycle limits
+    current_usage = get_current_duty_cycle_usage(state)
+    remaining_capacity = DUTY_CYCLE_MAX_ON_TIME - current_usage
     
-    info_msg = f"Duty cycle OK: {current_usage:.1f}s + {required_time:.1f}s <= {DUTY_CYCLE_MAX_ON_TIME}s ({DUTY_CYCLE_PERCENTAGE*100:.0f}% of {DUTY_CYCLE_PERIOD}s)"
-    return True, state, info_msg
+    if estimated_duration > remaining_capacity:
+        return {
+            "allowed": False,
+            "error": f"Movement would exceed 10% duty cycle limit. Current usage: {current_usage:.1f}s, Remaining: {remaining_capacity:.1f}s in {DUTY_CYCLE_PERIOD:.0f}s window",
+            "estimated_duration": estimated_duration,
+            "current_usage": current_usage,
+            "remaining_capacity": remaining_capacity,
+            "movement_type": movement_type,
+            "distance": distance
+        }
+    
+    return {
+        "allowed": True,
+        "error": None,
+        "estimated_duration": estimated_duration,
+        "current_usage": current_usage,
+        "remaining_capacity": remaining_capacity,
+        "movement_type": movement_type,
+        "distance": distance
+    }
 
 
 def get_duty_cycle_status(state: Dict[str, Any]) -> Dict[str, float]:
     """Get current duty cycle status information"""
     current_usage = get_current_duty_cycle_usage(state)
-    remaining_time = get_remaining_duty_time(state)
+    remaining_time = max(0, DUTY_CYCLE_MAX_ON_TIME - current_usage)
     percentage_used = current_usage / DUTY_CYCLE_MAX_ON_TIME * 100
     
     return {
@@ -135,3 +186,20 @@ def get_duty_cycle_status(state: Dict[str, Any]) -> Dict[str, float]:
         "percentage_used": percentage_used,
         "window_period": DUTY_CYCLE_PERIOD
     }
+
+
+def show_duty_cycle_status():
+    """Display current duty cycle status in a user-friendly format"""
+    state = load_state()
+    status = get_duty_cycle_status(state)
+    current_usage = get_current_duty_cycle_usage(state)
+    
+    print("Current Duty Cycle Status:")
+    print(f"  Current usage: {current_usage:.2f}s / {status['max_usage']}s")
+    print(f"  Percentage used: {status['percentage_used']:.2f}%")
+    print(f"  Remaining time: {status['remaining_time']:.2f}s")
+    print(f"  Window period: {status['window_period']}s ({status['window_period']/60:.0f} minutes)")
+    
+    if len(state.get("usage_periods", [])) > 0:
+        print(f"  Recent usage periods: {len(state['usage_periods'])}")
+        print(f"  Total up time (all time): {state.get('total_up_time', 0):.1f}s")

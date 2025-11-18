@@ -12,7 +12,10 @@ Usage Examples:
     python main.py                          # Interactive CLI
     python main.py test                     # Run test sequence
     python main.py deploy                   # Deploy Prefect automation
-    python main.py move 25.0 30.0          # Move from 25" to 30"
+    python main.py deploy --immediate       # Deploy immediate test
+    python main.py deploy --movements       # Deploy custom movements flow
+    python main.py move <current> <target>  # Move between heights
+    python main.py custom-movements         # Execute custom movements from JSON
     python main.py status                   # Show duty cycle status
 """
 
@@ -23,31 +26,13 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 # Import from the modular files
-from desk_controller import move_to_height, test_sequence, cli_interface
-from duty_cycle import get_duty_cycle_status, load_state
+from desk_controller import move_to_height, test_sequence, cli_interface, execute_custom_movements
+from duty_cycle import get_duty_cycle_status, show_duty_cycle_status, load_state
 
 
 def show_help():
     """Display help information"""
     print(__doc__)
-
-
-def show_duty_cycle_status():
-    """Show current duty cycle status"""
-    state = load_state()
-    status = get_duty_cycle_status(state)
-    
-    print("=== Duty Cycle Status ===")
-    print(f"Current usage: {status['current_usage']:.1f}s / {status['max_usage']}s")
-    print(f"Percentage used: {status['percentage_used']:.1f}%")
-    print(f"Remaining time: {status['remaining_time']:.1f}s")
-    print(f"Window period: {status['window_period']}s (20 minutes)")
-    print(f"Total periods tracked: {len(state['usage_periods'])}")
-    
-    if state.get("last_position"):
-        print(f"Last known position: {state['last_position']}\"")
-    if state.get("total_up_time"):
-        print(f"Total up time (all time): {state['total_up_time']:.1f}s")
 
 
 def main():
@@ -71,7 +56,7 @@ def main():
             
         result = test_sequence(distance, rest_time)
         if not result["success"]:
-            print(f"Test failed: {result.get('error', 'Unknown error')}")
+            print("Failed to deploy flows to Prefect Cloud")
             sys.exit(1)
             
     elif sys.argv[1] == "move":
@@ -93,12 +78,31 @@ def main():
         show_duty_cycle_status()
         
     elif sys.argv[1] == "deploy":
+        # Deploy Prefect flows
         if "--immediate" in sys.argv:
             from prefect_flows import deploy_test_sequence_immediate
             deploy_test_sequence_immediate()
+        elif "--movements" in sys.argv:
+            from prefect_flows import deploy_custom_movements_flow
+            deploy_custom_movements_flow()
         else:
             from prefect_flows import deploy_test_sequence
             deploy_test_sequence()
+            
+    elif sys.argv[1] == "custom-movements":
+        # Execute custom movements from JSON configuration
+        try:
+            result = execute_custom_movements()
+            if result["success"]:
+                print(f"✅ All movements completed successfully ({result['successful']}/{result['total_movements']})")
+            else:
+                print(f"❌ Some movements failed ({result['failed']}/{result['total_movements']} failed)")
+                for failed in [r for r in result['results'] if not r['success']]:
+                    print(f"  - {failed['movement_id']}: {failed['error']}")
+                sys.exit(1)
+        except Exception as e:
+            print(f"❌ Custom movements failed: {e}")
+            sys.exit(1)
             
     elif sys.argv[1] == "prefect-test":
         # Run test sequence via Prefect
