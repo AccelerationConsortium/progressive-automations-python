@@ -27,9 +27,12 @@ from progressive_automations_python.constants import (
 
 from progressive_automations_python.desk_controller import (
     move_to_height,
-    test_sequence,
-    execute_custom_movements,
     check_duty_cycle_status_before_execution
+)
+
+from progressive_automations_python.testing import (
+    test_sequence,
+    execute_custom_movements
 )
 
 from progressive_automations_python.duty_cycle import (

@@ -11,11 +11,13 @@ from prefect.logging import get_run_logger
 
 from progressive_automations_python.desk_controller import (
     move_to_height, 
-    test_sequence, 
-    LOWEST_HEIGHT,
-    execute_custom_movements,
     check_duty_cycle_status_before_execution
 )
+from progressive_automations_python.testing import (
+    test_sequence,
+    execute_custom_movements
+)
+from progressive_automations_python.config import LOWEST_HEIGHT
 from progressive_automations_python.duty_cycle import get_duty_cycle_status, load_state
 
 # Decorate core functions as tasks
@@ -30,11 +32,11 @@ check_duty_cycle_status_task = task(check_duty_cycle_status_before_execution)
 # =============================================================================
 
 @flow
-def simple_movement_flow(target_height: float, current_height: float = None):
+def simple_movement_flow(target_height: float):
     """Simple Prefect flow for moving to a specific height with duty cycle checking"""
     logger = get_run_logger()
     logger.info(f"=== SIMPLE MOVEMENT FLOW ===")
-    logger.info(f"Target: {target_height}\", Current: {current_height}\"")
+    logger.info(f"Target: {target_height}\"")
     
     # Check duty cycle status
     initial_status = check_duty_cycle_status_task()
@@ -45,7 +47,7 @@ def simple_movement_flow(target_height: float, current_height: float = None):
         raise ValueError("Insufficient duty cycle capacity - must wait for reset")
     
     # Execute the movement
-    result = move_to_height_task(target_height, current_height)
+    result = move_to_height_task(target_height)
     
     # Check final duty cycle status
     final_status = check_duty_cycle_status_task()

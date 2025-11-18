@@ -8,29 +8,8 @@ Provides safe pin control with proper initialization and cleanup.
 import time
 from typing import Tuple
 
-try:
-    import RPi.GPIO as GPIO
-    from progressive_automations_python.config import UP_PIN, DOWN_PIN
-except ImportError:
-    # For testing without actual GPIO hardware
-    class MockGPIO:
-        BCM = "BCM"
-        OUT = "OUT" 
-        IN = "IN"
-        LOW = 0
-        HIGH = 1
-        PUD_OFF = "PUD_OFF"
-        
-        @staticmethod
-        def setmode(mode): pass
-        @staticmethod  
-        def setup(pin, mode, **kwargs): pass
-        @staticmethod
-        def cleanup(): pass
-        
-    GPIO = MockGPIO()
-    # Use default pins if GPIO/config not available
-    from progressive_automations_python.config import UP_PIN, DOWN_PIN
+import RPi.GPIO as GPIO
+from progressive_automations_python.config import UP_PIN, DOWN_PIN
 
 
 def setup_gpio() -> None:
