@@ -8,6 +8,7 @@ Tracks individual usage periods and enforces both continuous runtime and total u
 import time
 import json
 import os
+from constants import HEIGHT_MIN
 from datetime import datetime
 from typing import List, Tuple, Dict, Any
 
@@ -20,16 +21,28 @@ MAX_CONTINUOUS_RUNTIME = 30  # Maximum continuous movement time in seconds
 STATE_FILE = "lifter_state.json"
 
 
-def load_state() -> Dict[str, Any]:
-    """Load the current state from JSON file"""
-    if os.path.exists(STATE_FILE):
-        with open(STATE_FILE, 'r') as f:
-            return json.load(f)
-    return {
-        "total_up_time": 0.0,
-        "last_position": None,
-        "usage_periods": []  # List of [start_timestamp, end_timestamp, duration] entries
-    }
+def load_state():
+    """Load the current state from file"""
+    try:
+        with open(STATE_FILE, "r") as f:
+            state = json.load(f)
+        
+        # Ensure all required keys exist with proper defaults
+        if "usage_periods" not in state:
+            state["usage_periods"] = []
+        if "last_position" not in state:
+            state["last_position"] = HEIGHT_MIN  # Default to minimum height
+        if "total_up_time" not in state:
+            state["total_up_time"] = 0.0
+        
+        return state
+    except FileNotFoundError:
+        # Return default state if file doesn't exist
+        return {
+            "usage_periods": [],
+            "last_position": HEIGHT_MIN,
+            "total_up_time": 0.0
+        }
 
 
 def save_state(state: Dict[str, Any]) -> None:

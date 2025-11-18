@@ -7,8 +7,10 @@ Provides safe pin control with proper initialization and cleanup.
 
 import time
 from typing import Tuple
+
 try:
     import RPi.GPIO as GPIO
+    from constants import UP_PIN, DOWN_PIN
 except ImportError:
     # For testing without actual GPIO hardware
     class MockGPIO:
@@ -27,10 +29,9 @@ except ImportError:
         def cleanup(): pass
         
     GPIO = MockGPIO()
-
-# Pin assignments
-UP_PIN = 17   # BCM numbering, physical pin 11
-DOWN_PIN = 27 # BCM numbering, physical pin 13
+    # Use default pins if constants not available (match constants.py)
+    UP_PIN = 18
+    DOWN_PIN = 17
 
 
 def setup_gpio() -> None:

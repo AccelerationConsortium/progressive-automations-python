@@ -137,7 +137,7 @@ def deploy_test_sequence(schedule_cron: str = "39 4 * * *", deployment_name: str
     
     custom_test_sequence_flow.from_source(
         source=".",
-        entrypoint="scripts/prefect_flows.py:custom_test_sequence_flow",
+        entrypoint="prefect_flows.py:custom_test_sequence_flow",
     ).deploy(
         name=deployment_name,
         work_pool_name="default-agent-pool", 
@@ -146,6 +146,23 @@ def deploy_test_sequence(schedule_cron: str = "39 4 * * *", deployment_name: str
     
     print(f"Deployment '{deployment_name}' created with schedule '{schedule_cron}'!")
     print("Run 'prefect worker start --pool default-agent-pool' to execute scheduled flows.")
+
+
+def deploy_test_sequence_immediate(deployment_name: str = "desk-lifter-test-immediate"):
+    """Deploy the test sequence without scheduling for immediate execution"""
+    
+    deployment = custom_test_sequence_flow.from_source(
+        source=".",
+        entrypoint="prefect_flows.py:custom_test_sequence_flow",
+    ).deploy(
+        name=deployment_name,
+        work_pool_name="default-process-pool",
+        # No cron schedule - runs on demand only
+    )
+    
+    print(f"Deployment '{deployment_name}' created for immediate execution!")
+    print(f"To run immediately: prefect deployment run 'custom-test-sequence-flow/{deployment_name}'")
+    return deployment_name
 
 
 if __name__ == "__main__":

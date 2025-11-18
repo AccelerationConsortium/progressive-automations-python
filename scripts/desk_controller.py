@@ -12,11 +12,14 @@ from duty_cycle import (
 )
 from movement_control import setup_gpio, cleanup_gpio, move_up, move_down
 
-# Calibration data
-LOWEST_HEIGHT = 23.7  # inches
-HIGHEST_HEIGHT = 54.5  # inches
-UP_RATE = 0.54  # inches per second
-DOWN_RATE = 0.55  # inches per second
+try:
+    from constants import LOWEST_HEIGHT, HIGHEST_HEIGHT, UP_RATE, DOWN_RATE
+except ImportError:
+    # Fallback values if constants not available
+    LOWEST_HEIGHT = 23.7  # inches
+    HIGHEST_HEIGHT = 54.5  # inches
+    UP_RATE = 0.54  # inches per second
+    DOWN_RATE = 0.55  # inches per second
 
 
 def move_to_height(target_height: float, current_height: Optional[float] = None) -> dict:

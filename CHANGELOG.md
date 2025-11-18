@@ -6,6 +6,7 @@
 - FIX: nasty bug #1729 fixed
 - add your changes here!
 
+- Hardware: Changed GPIO pin assignments - UP: GPIO 18, DOWN: GPIO 17 — 2025-11-18
 - Refactor: Centralized GPIO pin constants in `scripts/constants.py` for maintainability — 2025-11-14
 - Docs: Added `docs/bill_of_materials.md` (Bill of Materials) — 2025-11-14
 - Docs: Added official product links to `docs/bill_of_materials.md` — 2025-11-14
