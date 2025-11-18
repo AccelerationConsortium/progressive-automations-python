@@ -14,15 +14,50 @@
 
 # progressive-automations-python
 
-> Python package for programmatically controlling progressive automations tools (e.g., LG-07 modular lifting column via FLTCON).
+> Python package for programmatically controlling Progressive Automations desk lifters (e.g., LG-07 modular lifting column via FLTCON) with Prefect workflow orchestration.
 
-A longer description of your project goes here...
+Control your desk lifter remotely via Prefect Cloud deployments with asynchronous execution and position polling. Perfect for laboratory automation where the desk position needs to be coordinated with other equipment.
 
-## Setup
+## Quick Start
 
-For Raspberry Pi 5 setup instructions, see [docs/raspberry-pi-setup.md](docs/raspberry-pi-setup.md).
+```bash
+# 1. Install
+pip install progressive-automations-python
 
-For bill of materials, see [docs/bill_of_materials.md](docs/bill_of_materials.md).
+# 2. Configure Prefect Cloud
+prefect cloud login -k <your-api-key>
+prefect work-pool create default-process-pool --type process
+
+# 3. Deploy flows
+python -c "from progressive_automations_python.deployment import create_deployments; create_deployments()"
+
+# 4. Start worker on Raspberry Pi
+prefect worker start --pool default-process-pool
+```
+
+## Usage
+
+Trigger movements asynchronously from any Python environment:
+
+```python
+from prefect.deployments import run_deployment
+
+# Trigger movement (returns immediately)
+flow_run = run_deployment(
+    name="simple-movement-flow/move-to-position",
+    parameters={"target_height": 35.5},
+    timeout=0  # Don't wait, return immediately
+)
+
+# Poll status later
+# ... (see documentation for polling examples)
+```
+
+## Documentation
+
+- [Installation and Usage Guide](docs/installation-and-usage.md) - Complete setup and API reference
+- [Raspberry Pi Setup](docs/raspberry-pi-setup.md) - Hardware configuration
+- [Bill of Materials](docs/bill_of_materials.md) - Required components
 
 
 <!-- pyscaffold-notes -->

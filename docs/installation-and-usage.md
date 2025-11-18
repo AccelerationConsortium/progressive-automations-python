@@ -24,15 +24,31 @@ You need a Prefect Cloud account for remote workflow orchestration.
 
 1. Sign up at [https://www.prefect.io/](https://www.prefect.io/)
 2. Get your API key from the Prefect Cloud dashboard
-3. Login from your Raspberry Pi:
+3. Login from your Raspberry Pi using Prefect's CLI:
 
 ```bash
 prefect cloud login -k <your-api-key>
 ```
 
-### Step 3: Deploy Flows to Prefect Cloud
+### Step 3: Create Work Pool
 
-Deploy all desk control flows:
+Create a work pool for the desk lifter using Prefect's CLI:
+
+```bash
+prefect work-pool create default-process-pool --type process
+```
+
+### Step 4: Deploy Flows to Prefect Cloud
+
+Deploy all desk control flows using Python:
+
+```python
+from progressive_automations_python.deployment import create_deployments
+
+create_deployments("default-process-pool")
+```
+
+Or use the convenience CLI (for initial setup only):
 
 ```bash
 progressive_automations_python --deploy
@@ -45,21 +61,23 @@ This creates the following deployments:
 - `duty-cycle-monitoring-flow/duty-cycle-monitor` - On-demand duty cycle check
 - `scheduled-duty-cycle-check/duty-cycle-monitor-scheduled` - Scheduled monitoring (every 10 min)
 
-### Step 4: Start a Prefect Worker
+### Step 5: Start a Prefect Worker
 
-On your Raspberry Pi, start a worker to execute flows:
+On your Raspberry Pi, start a worker to execute flows using Prefect's CLI:
 
 ```bash
 prefect worker start --pool default-process-pool
 ```
 
-Keep this running in a terminal or as a systemd service.
+Keep this running in a terminal or set up as a systemd service for automatic startup.
 
-## Basic Usage
+## Testing During Initial Setup
+
+> **Note**: The `progressive_automations_python` CLI is provided for initial hardware testing and troubleshooting only. For production use, trigger flows via `run_deployment()` or Prefect's CLI.
 
 ### Test Hardware Connections
 
-Test UP or DOWN movement for 2 seconds:
+Test UP or DOWN movement for 2 seconds to verify GPIO connections:
 
 ```bash
 progressive_automations_python --test UP
@@ -68,39 +86,15 @@ progressive_automations_python --test DOWN
 
 ### Check Duty Cycle Status
 
-View current duty cycle usage:
+View current duty cycle usage during debugging:
 
 ```bash
 progressive_automations_python --status
 ```
 
-### Move to a Specific Height
+## Production Usage: Async Deployment and Position Polling
 
-Move directly to a target height:
-
-```bash
-# Move to 30 inches (uses last known position)
-progressive_automations_python --move 30.0
-
-# Move from 24 inches to 30 inches
-progressive_automations_python --move 30.0 --current 24.0
-```
-
-### Run a Test Sequence
-
-Execute a test movement (up, wait, down):
-
-```bash
-# Default: move 0.5 inches up, wait 10 seconds, move back down
-progressive_automations_python --test-sequence
-
-# Custom distance and wait time
-progressive_automations_python --test-sequence --distance 1.0 --rest 15.0
-```
-
-## Advanced Usage: Async Deployment and Position Polling
-
-The key feature of this system is the ability to trigger movements asynchronously from external systems and poll their status later.
+**This is the primary way to use the desk lifter system.** Trigger movements asynchronously from external systems and poll their status later.
 
 ### Triggering Movements Asynchronously
 
@@ -224,6 +218,8 @@ else:
 Check if there's enough duty cycle capacity before triggering a movement:
 
 ```python
+from prefect.deployments import run_deployment
+
 # Check current duty cycle status
 status_run = run_deployment(
     name="duty-cycle-monitoring-flow/duty-cycle-monitor",
@@ -243,6 +239,21 @@ if remaining > 10:  # Need at least 10 seconds
 else:
     print(f"⚠️ Insufficient duty cycle capacity ({remaining:.1f}s remaining)")
     print("Wait for duty cycle window to reset")
+```
+
+### Using Prefect CLI for Manual Triggers
+
+You can also trigger flows directly using Prefect's CLI:
+
+```bash
+# Trigger a movement to 30 inches
+prefect deployment run 'simple-movement-flow/move-to-position' --param target_height=30.0
+
+# Run a test sequence
+prefect deployment run 'test-sequence-flow/test-sequence' --param movement_distance=0.5 --param rest_time=10.0
+
+# Check duty cycle
+prefect deployment run 'duty-cycle-monitoring-flow/duty-cycle-monitor'
 ```
 
 ## Integration with Other Equipment
@@ -372,22 +383,37 @@ The system will remember the position for future movements.
 
 ## Command Reference
 
+### Prefect CLI (Primary Interface)
+
 ```bash
-# Hardware testing
+# Login to Prefect Cloud
+prefect cloud login -k <api-key>
+
+# Create work pool
+prefect work-pool create default-process-pool --type process
+
+# Start worker (keep running)
+prefect worker start --pool default-process-pool
+
+# Trigger deployments manually
+prefect deployment run 'simple-movement-flow/move-to-position' --param target_height=30.0
+prefect deployment run 'test-sequence-flow/test-sequence'
+prefect deployment run 'duty-cycle-monitoring-flow/duty-cycle-monitor'
+```
+
+### Package CLI (Testing/Debugging Only)
+
+```bash
+# Hardware testing (initial setup)
 progressive_automations_python --test UP|DOWN
 
-# Status and monitoring
+# Status check (debugging)
 progressive_automations_python --status
 
-# Direct movements
-progressive_automations_python --move TARGET [--current CURRENT]
-progressive_automations_python --test-sequence [--distance DIST] [--rest TIME]
-
-# Prefect deployment
+# Deployment (initial setup convenience)
 progressive_automations_python --deploy [--work-pool POOL]
 
-# Utilities
-progressive_automations_python --generate-movements
+# View examples
 progressive_automations_python --examples
 ```
 
@@ -408,13 +434,14 @@ This displays comprehensive code examples for:
 
 ## Next Steps
 
-1. ✅ Complete hardware setup
+1. ✅ Complete hardware setup per [Raspberry Pi Setup](raspberry-pi-setup.md)
 2. ✅ Install package: `pip install progressive-automations-python`
 3. ✅ Configure Prefect Cloud: `prefect cloud login -k <api-key>`
-4. ✅ Deploy flows: `progressive_automations_python --deploy`
-5. ✅ Start worker: `prefect worker start --pool default-process-pool`
-6. ✅ Test: `progressive_automations_python --test UP`
-7. ✅ Integrate with your automation workflow!
+4. ✅ Create work pool: `prefect work-pool create default-process-pool --type process`
+5. ✅ Deploy flows (Python or CLI): `progressive_automations_python --deploy`
+6. ✅ Start worker: `prefect worker start --pool default-process-pool`
+7. ✅ Test hardware (optional): `progressive_automations_python --test UP`
+8. ✅ **Trigger flows via `run_deployment()` from your automation code!**
 
 For more information, see:
 - [Raspberry Pi Setup](raspberry-pi-setup.md)

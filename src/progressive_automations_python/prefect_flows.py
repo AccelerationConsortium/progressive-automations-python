@@ -2,129 +2,27 @@
 Simplified Prefect flows for automated desk control.
 
 Provides scheduled automation and workflow orchestration using Prefect.
-Uses the comprehensive desk_controller.execute_custom_movements() function.
+Directly decorates core functions from desk_controller for task execution.
 """
 
 import time
-import os
-import sys
 from prefect import flow, task
 from prefect.logging import get_run_logger
 
-# Add the scripts directory to Python path for imports
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-
-# Import our modular components  
-from desk_controller import (
+from progressive_automations_python.desk_controller import (
     move_to_height, 
     test_sequence, 
     LOWEST_HEIGHT,
     execute_custom_movements,
     check_duty_cycle_status_before_execution
 )
-from duty_cycle import show_duty_cycle_status, get_duty_cycle_status, load_state
+from progressive_automations_python.duty_cycle import get_duty_cycle_status, load_state
 
-
-@task
-def log_info(message: str):
-    """Log information message"""
-    print(message)
-
-
-@task
-def duty_cycle_status_task():
-    """
-    Check duty cycle status as a Prefect task.
-    Reuses existing check_duty_cycle_status_before_execution() from desk_controller.
-    """
-    logger = get_run_logger()
-    
-    try:
-        # Use the existing function - no need to reimplement
-        status = check_duty_cycle_status_before_execution()
-        
-        # Log for Prefect monitoring
-        logger.info(f"Duty cycle check completed:")
-        logger.info(f"  Usage: {status['current_usage']:.1f}s / 120s ({status['percentage_used']:.1f}%)")
-        logger.info(f"  Remaining: {status['remaining_capacity']:.1f}s")
-        logger.info(f"  Position: {status['current_position']}\"")
-        
-        return status
-        
-    except Exception as e:
-        logger.error(f"Failed to check duty cycle status: {e}")
-        raise
-
-
-@task  
-def execute_movement(target_height: float, current_height: float = None):
-    """Execute a single movement as a Prefect task"""
-    logger = get_run_logger()
-    
-    try:
-        result = move_to_height(target_height, current_height)
-        
-        if result["success"]:
-            logger.info(f"Movement successful: {result}")
-            return result
-        else:
-            logger.error(f"Movement failed: {result['error']}")
-            raise ValueError(result["error"])
-            
-    except Exception as e:
-        logger.error(f"Movement execution failed: {e}")
-        raise
-
-
-@task
-def execute_custom_movements_task(config_file: str = "movement_configs.json"):
-    """
-    Execute custom movements from configuration file as a Prefect task.
-    
-    This is a thin wrapper around desk_controller.execute_custom_movements()
-    which already handles all the complexity:
-    - Loading movement configs
-    - Pre-execution duty cycle checking  
-    - Movement validation
-    - Movement execution
-    - Post-execution status reporting
-    """
-    logger = get_run_logger()
-    logger.info(f"Executing custom movements from {config_file}")
-    
-    try:
-        # This function does EVERYTHING - no need for separate loading/validation tasks
-        result = execute_custom_movements(config_file)
-        
-        if result["success"]:
-            logger.info(f"✅ All movements completed successfully ({result['successful']}/{result['total_movements']})")
-        else:
-            logger.info(f"⚠️ Movements completed with some failures ({result['failed']}/{result['total_movements']} failed)")
-            
-        return result
-    except Exception as e:
-        logger.error(f"❌ Custom movements execution failed: {e}")
-        raise
-
-
-@task
-def execute_test_sequence(movement_distance: float = 0.5, rest_time: float = 10.0):
-    """Execute test sequence as a Prefect task"""
-    logger = get_run_logger()
-    
-    try:
-        result = test_sequence(movement_distance, rest_time)
-        
-        if result["success"]:
-            logger.info(f"Test sequence successful: {result}")
-            return result
-        else:
-            logger.error(f"Test sequence failed: {result.get('error', 'Unknown error')}")
-            raise ValueError(result.get("error", "Test sequence failed"))
-            
-    except Exception as e:
-        logger.error(f"Test sequence execution failed: {e}")
-        raise
+# Decorate core functions as tasks
+move_to_height_task = task(move_to_height)
+test_sequence_task = task(test_sequence)
+execute_custom_movements_task = task(execute_custom_movements)
+check_duty_cycle_status_task = task(check_duty_cycle_status_before_execution)
 
 
 # =============================================================================
@@ -138,8 +36,8 @@ def simple_movement_flow(target_height: float, current_height: float = None):
     logger.info(f"=== SIMPLE MOVEMENT FLOW ===")
     logger.info(f"Target: {target_height}\", Current: {current_height}\"")
     
-    # Check duty cycle status using existing function
-    initial_status = duty_cycle_status_task()
+    # Check duty cycle status
+    initial_status = check_duty_cycle_status_task()
     
     # Abort if insufficient capacity
     if initial_status["remaining_capacity"] < 1.0:
@@ -147,10 +45,10 @@ def simple_movement_flow(target_height: float, current_height: float = None):
         raise ValueError("Insufficient duty cycle capacity - must wait for reset")
     
     # Execute the movement
-    result = execute_movement(target_height, current_height)
+    result = move_to_height_task(target_height, current_height)
     
     # Check final duty cycle status
-    final_status = duty_cycle_status_task()
+    final_status = check_duty_cycle_status_task()
     
     # Log usage
     capacity_used = initial_status["remaining_capacity"] - final_status["remaining_capacity"]
@@ -166,16 +64,11 @@ def simple_movement_flow(target_height: float, current_height: float = None):
 
 @flow
 def custom_movements_flow(config_file: str = "movement_configs.json"):
-    """
-    Simplified Prefect flow to execute custom movements.
-    
-    Uses the comprehensive desk_controller.execute_custom_movements() function
-    which already includes all necessary features internally.
-    """
+    """Flow to execute custom movements from configuration file"""
     logger = get_run_logger()
     logger.info("=== CUSTOM MOVEMENTS FLOW ===")
     
-    # Execute custom movements - this function already does all the duty cycle checking
+    # Execute custom movements
     result = execute_custom_movements_task(config_file)
     
     logger.info("Custom movements flow completed")
@@ -184,15 +77,12 @@ def custom_movements_flow(config_file: str = "movement_configs.json"):
 
 @flow
 def duty_cycle_monitoring_flow():
-    """
-    Simplified duty cycle monitoring flow.
-    Uses existing duty cycle checking functions.
-    """
+    """Flow for monitoring duty cycle status"""
     logger = get_run_logger()
     logger.info("=== DUTY CYCLE MONITORING FLOW ===")
     
-    # Use existing duty cycle status function
-    status = duty_cycle_status_task()
+    # Check duty cycle status
+    status = check_duty_cycle_status_task()
     
     # Simple recommendation logic
     remaining = status["remaining_capacity"]
@@ -219,17 +109,14 @@ def duty_cycle_monitoring_flow():
 
 @flow
 def scheduled_duty_cycle_check():
-    """
-    Scheduled duty cycle monitoring using existing functions.
-    Just wraps duty_cycle_monitoring_flow for scheduled execution.
-    """
+    """Scheduled duty cycle monitoring flow"""
     logger = get_run_logger()
     logger.info("=== SCHEDULED DUTY CYCLE CHECK ===")
     
     # Use the monitoring flow
     result = duty_cycle_monitoring_flow()
     
-    # Log summary for scheduled monitoring
+    # Log summary
     status = result["status"]
     logger.info(f"Scheduled duty cycle check:")
     logger.info(f"  Usage: {status['current_usage']:.1f}s / 120s ({status['percentage_used']:.1f}%)")
@@ -249,14 +136,14 @@ def test_sequence_flow(movement_distance: float = 0.5, rest_time: float = 10.0):
     logger.info(f"=== TEST SEQUENCE FLOW ===")
     logger.info(f"Distance: {movement_distance}\", Rest: {rest_time}s")
     
-    # Check duty cycle before starting using existing function
-    initial_status = duty_cycle_status_task()
+    # Check duty cycle before starting
+    initial_status = check_duty_cycle_status_task()
     
     # Execute test sequence
-    result = execute_test_sequence(movement_distance, rest_time)
+    result = test_sequence_task(movement_distance, rest_time)
     
     # Check final status
-    final_status = duty_cycle_status_task()
+    final_status = check_duty_cycle_status_task()
     
     logger.info("Test sequence flow completed")
     return {
