@@ -1,8 +1,7 @@
 # test_up.py
 import time
 import RPi.GPIO as GPIO
-
-UP_PIN = 17  # BCM numbering, physical pin 11
+from constants import UP_PIN
 
 GPIO.setmode(GPIO.BCM)
 

@@ -6,8 +6,8 @@ This document describes the setup required to run the desk lifter control script
 
 - Raspberry Pi 5 (with BCM2712 SoC)
 - GPIO pins connected to the desk lifter motor controller:
-  - UP_PIN: GPIO 17 (physical pin 11)
-  - DOWN_PIN: GPIO 27 (physical pin 13)
+  - UP_PIN: GPIO 18 (physical pin 12)
+  - DOWN_PIN: GPIO 17 (physical pin 11)
 - Power supply: 5V USB-C (at least 3A, preferably 5A for high-power peripherals)
 
 ## Software Requirements
@@ -41,16 +41,10 @@ The standard `RPi.GPIO` library does not support Raspberry Pi 5 due to changes i
 
 4. **Remove incompatible RPi.GPIO package** (if installed):
    ```bash
-   sudo apt remove -y python3-rpi.gpioRP
+   sudo apt remove -y python3-rpi.gpio
    ```
 
-5. **Install rpi-lgpio in the virtual environment**:
-   ```bash
-   source venv/bin/activate
-   pip install rpi-lgpio
-   ```
-
-6. **Ensure user is in the gpio group** (for GPIO access without sudo):
+5. **Ensure user is in the gpio group** (for GPIO access without sudo):
    ```bash
    sudo usermod -a -G gpio $USER
    ```
@@ -68,6 +62,8 @@ python move_to_height_no_reset.py
 
 Available scripts:
 - `move_to_height_no_reset.py`: Move the desk to a target height
+- `move_to_height.py`: Alternative height control script
+- `desk_control_prefect.py`: Prefect-based workflow orchestration
 - `test_up.py`: Test upward movement
 - `test_down.py`: Test downward movement
 - `reset_to_lowest.py`: Reset to lowest position

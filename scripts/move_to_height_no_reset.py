@@ -2,6 +2,7 @@ import time
 import json
 import os
 import RPi.GPIO as GPIO
+from constants import UP_PIN, DOWN_PIN
 
 # Calibration data
 LOWEST_HEIGHT = 23.7  # inches
@@ -10,9 +11,6 @@ UP_RATE = 0.54  # inches per second
 DOWN_RATE = 0.55  # inches per second
 
 STATE_FILE = "lifter_state.json"
-
-UP_PIN = 17   # BCM numbering, physical pin 11
-DOWN_PIN = 27 # BCM numbering, physical pin 13
 
 GPIO.setmode(GPIO.BCM)
 

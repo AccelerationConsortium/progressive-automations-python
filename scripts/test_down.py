@@ -1,7 +1,6 @@
 import time
 import RPi.GPIO as GPIO
-
-DOWN_PIN = 27  # BCM numbering, physical pin 13
+from constants import DOWN_PIN
 
 GPIO.setmode(GPIO.BCM)
 

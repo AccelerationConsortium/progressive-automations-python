@@ -3,7 +3,9 @@ import json
 import os
 from datetime import datetime, timedelta
 from prefect import flow, task
+from prefect.logging import get_run_logger
 import RPi.GPIO as GPIO
+from constants import UP_PIN, DOWN_PIN
 
 # Calibration data
 LOWEST_HEIGHT = 23.7  # inches
@@ -12,11 +14,10 @@ UP_RATE = 0.54  # inches per second
 DOWN_RATE = 0.55  # inches per second
 
 STATE_FILE = "lifter_state.json"
-MAX_USAGE_TIME = 120  # 2 minutes in seconds
-RESET_WINDOW = 1200   # 20 minutes in seconds
-
-UP_PIN = 17   # BCM numbering, physical pin 11
-DOWN_PIN = 27 # BCM numbering, physical pin 13
+DUTY_CYCLE_PERIOD = 1200  # 20 minutes in seconds
+DUTY_CYCLE_MAX_ON_TIME = 120  # 2 minutes in seconds (10% of 20 minutes)
+DUTY_CYCLE_PERCENTAGE = 0.10  # 10% duty cycle
+MAX_CONTINUOUS_RUNTIME = 30  # Maximum continuous movement time in seconds
 
 GPIO.setmode(GPIO.BCM)
 
@@ -61,8 +62,7 @@ def load_state():
     return {
         "total_up_time": 0.0,
         "last_position": None,
-        "last_reset_time": datetime.now().isoformat(),
-        "current_window_usage": 0.0
+        "usage_periods": []  # List of [start_timestamp, end_timestamp, duration] entries
     }
 
 @task
@@ -72,49 +72,109 @@ def save_state(state):
         json.dump(state, f, indent=2)
 
 @task
+def clean_old_usage_periods(state):
+    """Remove usage periods older than the duty cycle period"""
+    current_time = time.time()
+    cutoff_time = current_time - DUTY_CYCLE_PERIOD
+    
+    # Keep only periods that end after the cutoff time
+    state["usage_periods"] = [
+        period for period in state["usage_periods"] 
+        if period[1] > cutoff_time  # period[1] is end_timestamp
+    ]
+    return state
+
+@task
+def get_current_duty_cycle_usage(state):
+    """Calculate current duty cycle usage in the sliding window"""
+    clean_old_usage_periods(state)
+    current_time = time.time()
+    
+    total_usage = 0.0
+    for start_time, end_time, duration in state["usage_periods"]:
+        # Only count usage that's within the duty cycle period
+        window_start = current_time - DUTY_CYCLE_PERIOD
+        
+        # Adjust start and end times to the current window
+        effective_start = max(start_time, window_start)
+        effective_end = min(end_time, current_time)
+        
+        if effective_end > effective_start:
+            total_usage += effective_end - effective_start
+    
+    return total_usage
+
+@task
+def get_remaining_duty_time(state):
+    """Get remaining duty cycle time in seconds"""
+    current_usage = get_current_duty_cycle_usage(state)
+    return max(0, DUTY_CYCLE_MAX_ON_TIME - current_usage)
+
+@task
+def record_usage_period(state, start_time, end_time, duration):
+    """Record a usage period in the duty cycle tracking"""
+    state["usage_periods"].append([start_time, end_time, duration])
+    return state
+
+@task
 def check_timing_limits(state, required_time):
-    """Check if the movement is within timing limits"""
-    current_time = datetime.now()
-    last_reset = datetime.fromisoformat(state["last_reset_time"])
+    """Check if the movement is within duty cycle limits using sliding window"""
+    logger = get_run_logger()
     
-    # Check if 20-minute window has passed
-    if (current_time - last_reset).total_seconds() >= RESET_WINDOW:
-        # Reset the usage window
-        state["last_reset_time"] = current_time.isoformat()
-        state["current_window_usage"] = 0.0
-        return True, state
+    # Clean old periods and get current usage
+    state = clean_old_usage_periods(state)
+    current_usage = get_current_duty_cycle_usage(state)
     
-    # Check if adding this movement would exceed the 2-minute limit
-    if state["current_window_usage"] + required_time > MAX_USAGE_TIME:
-        remaining_time = MAX_USAGE_TIME - state["current_window_usage"]
-        raise ValueError(f"Movement would exceed 2-minute limit. Remaining time: {remaining_time:.1f}s")
+    # Check continuous runtime limit
+    if required_time > MAX_CONTINUOUS_RUNTIME:
+        raise ValueError(f"Movement duration {required_time:.1f}s exceeds maximum continuous runtime of {MAX_CONTINUOUS_RUNTIME}s")
     
+    # Check if adding this movement would exceed the duty cycle limit
+    if current_usage + required_time > DUTY_CYCLE_MAX_ON_TIME:
+        remaining_time = DUTY_CYCLE_MAX_ON_TIME - current_usage
+        raise ValueError(f"Movement would exceed {DUTY_CYCLE_PERCENTAGE*100:.0f}% duty cycle limit. Current usage: {current_usage:.1f}s, Remaining: {remaining_time:.1f}s in {DUTY_CYCLE_PERIOD}s window")
+    
+    logger.info(f"Duty cycle OK: {current_usage:.1f}s + {required_time:.1f}s <= {DUTY_CYCLE_MAX_ON_TIME}s ({DUTY_CYCLE_PERCENTAGE*100:.0f}% of {DUTY_CYCLE_PERIOD}s)")
     return True, state
 
 @task
 def move_up(up_time):
-    """Execute upward movement for specified time"""
-    print(f"Moving UP for {up_time:.1f} seconds...")
+    """Execute upward movement for specified time with duty cycle tracking"""
+    logger = get_run_logger()
+    logger.info(f"Moving UP for {up_time:.1f} seconds...")
+    
     release_up()
-    # Removed input() for automated execution
+    start_time = time.time()
     press_up()
     time.sleep(up_time)
     release_up()
+    end_time = time.time()
+    actual_duration = end_time - start_time
+    
+    logger.info(f"UP movement completed: {actual_duration:.1f}s actual")
+    return start_time, end_time, actual_duration
 
 @task
 def move_down(down_time):
-    """Execute downward movement for specified time"""
-    print(f"Moving DOWN for {down_time:.1f} seconds...")
+    """Execute downward movement for specified time with duty cycle tracking"""
+    logger = get_run_logger()
+    logger.info(f"Moving DOWN for {down_time:.1f} seconds...")
+    
     release_down()
-    # Removed input() for automated execution
+    start_time = time.time()
     press_down()
     time.sleep(down_time)
     release_down()
+    end_time = time.time()
+    actual_duration = end_time - start_time
+    
+    logger.info(f"DOWN movement completed: {actual_duration:.1f}s actual")
+    return start_time, end_time, actual_duration
 
-#@flow
-@task
+@flow
 def move_to_height_flow(target_height: float, current_height: float):
     """Main flow to move desk to target height with safety checks"""
+    logger = get_run_logger()
     
     # Validate height range
     if not (LOWEST_HEIGHT <= target_height <= HIGHEST_HEIGHT):
@@ -130,7 +190,7 @@ def move_to_height_flow(target_height: float, current_height: float):
         # Calculate movement requirements
         delta = target_height - current_height
         if abs(delta) < 0.01:
-            print(f"Already at {target_height}'' (within tolerance). No movement needed.")
+            logger.info(f"Already at {target_height}'' (within tolerance). No movement needed.")
             return
         
         if delta > 0:
@@ -138,34 +198,41 @@ def move_to_height_flow(target_height: float, current_height: float):
             up_time = delta / UP_RATE
             
             # Check timing limits
-            check_timing_limits(state, up_time)
+            is_valid, updated_state = check_timing_limits(state, up_time)
+            state = updated_state
             
-            # Execute movement
-            move_up(up_time)
+            # Execute movement and get actual timing
+            start_time, end_time, actual_duration = move_up(up_time)
             
-            # Update state
-            state["total_up_time"] += up_time
-            state["current_window_usage"] += up_time
+            # Record the usage period and update state
+            state = record_usage_period(state, start_time, end_time, actual_duration)
+            state["total_up_time"] += actual_duration
         else:
             # Moving down
             down_time = abs(delta) / DOWN_RATE
             
             # Check timing limits
-            check_timing_limits(state, down_time)
+            is_valid, updated_state = check_timing_limits(state, down_time)
+            state = updated_state
             
-            # Execute movement
-            move_down(down_time)
+            # Execute movement and get actual timing
+            start_time, end_time, actual_duration = move_down(down_time)
             
-            # Update state (down time counts toward window usage but not total_up_time)
-            state["current_window_usage"] += down_time
+            # Record the usage period (down time counts toward duty cycle but not total_up_time)
+            state = record_usage_period(state, start_time, end_time, actual_duration)
         
         # Update position and save state
         state["last_position"] = target_height
         save_state(state)
         
-        print(f"Arrived at {target_height}'' (approximate). State saved.")
-        print(f"Window usage: {state['current_window_usage']:.1f}s / {MAX_USAGE_TIME}s")
-        print(f"Total up time: {state['total_up_time']:.1f}s")
+        # Get current duty cycle info for logging
+        current_usage = get_current_duty_cycle_usage(state)
+        remaining_time = get_remaining_duty_time(state)
+        
+        logger.info(f"Arrived at {target_height}'' (approximate). State saved.")
+        logger.info(f"Duty cycle usage: {current_usage:.1f}s / {DUTY_CYCLE_MAX_ON_TIME}s ({current_usage/DUTY_CYCLE_MAX_ON_TIME*100:.1f}%)")
+        logger.info(f"Remaining duty time: {remaining_time:.1f}s")
+        logger.info(f"Total up time: {state['total_up_time']:.1f}s")
         
     finally:
         # Always clean up GPIO
@@ -222,7 +289,7 @@ if __name__ == "__main__":
         ).deploy(
             name="desk-lifter-test-sequence-1139pm-toronto",
             work_pool_name="default-agent-pool",
-            #cron="39 4 * * *",  # Run daily at 11:39 PM Toronto time (4:39 AM UTC)
+            cron="39 4 * * *",  # Run daily at 11:39 PM Toronto time (4:39 AM UTC)
         )
         print("Deployment created! Run 'prefect worker start --pool default-agent-pool' to execute scheduled flows.")
     elif len(sys.argv) > 1 and sys.argv[1] == "test":
