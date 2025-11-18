@@ -8,7 +8,7 @@ Tracks individual usage periods and enforces both continuous runtime and total u
 import time
 import json
 import os
-from constants import HEIGHT_MIN
+from constants import LOWEST_HEIGHT
 from datetime import datetime
 from typing import List, Tuple, Dict, Any
 
@@ -31,7 +31,7 @@ def load_state():
         if "usage_periods" not in state:
             state["usage_periods"] = []
         if "last_position" not in state:
-            state["last_position"] = HEIGHT_MIN  # Default to minimum height
+            state["last_position"] = LOWEST_HEIGHT  # Default to minimum height
         if "total_up_time" not in state:
             state["total_up_time"] = 0.0
         
@@ -40,7 +40,7 @@ def load_state():
         # Return default state if file doesn't exist
         return {
             "usage_periods": [],
-            "last_position": HEIGHT_MIN,
+            "last_position": LOWEST_HEIGHT,
             "total_up_time": 0.0
         }
 
