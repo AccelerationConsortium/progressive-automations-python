@@ -61,15 +61,7 @@ def show_status():
 
 
 
-def show_examples():
-    """Show usage examples for async deployment"""
-    try:
-        from progressive_automations_python.deployment import get_deployment_examples
-        print(get_deployment_examples())
-        return 0
-    except Exception as e:
-        print(f"Error showing examples: {e}")
-        return 1
+
 
 
 def main():
@@ -82,7 +74,6 @@ Examples (for testing/debugging only):
   progressive_automations_python --test UP
   progressive_automations_python --test DOWN
   progressive_automations_python --status
-  progressive_automations_python --examples
         """
     )
     
@@ -99,12 +90,6 @@ Examples (for testing/debugging only):
         help="Show current duty cycle status"
     )
     
-    parser.add_argument(
-        "--examples",
-        action="store_true",
-        help="Show examples for async deployment and position polling"
-    )
-    
     args = parser.parse_args()
     
     # Handle commands
@@ -112,8 +97,6 @@ Examples (for testing/debugging only):
         return test_movement(args.test)
     elif args.status:
         return show_status()
-    elif args.examples:
-        return show_examples()
     else:
         parser.print_help()
         return 0

@@ -48,8 +48,7 @@ from progressive_automations_python.prefect_flows import (
 )
 
 from progressive_automations_python.deployment import (
-    create_deployments,
-    get_deployment_examples
+    create_deployments
 )
 
 from progressive_automations_python.generate_movements import (
@@ -76,8 +75,6 @@ __all__ = [
     "custom_movements_flow",
     "test_sequence_flow",
     "duty_cycle_monitoring_flow",
-    "scheduled_duty_cycle_check",
     "create_deployments",
-    "get_deployment_examples",
     "generate_duty_cycle_test_config"
 ]

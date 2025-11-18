@@ -107,28 +107,6 @@ def duty_cycle_monitoring_flow():
     }
 
 
-@flow
-def scheduled_duty_cycle_check():
-    """Scheduled duty cycle monitoring flow"""
-    logger = get_run_logger()
-    logger.info("=== SCHEDULED DUTY CYCLE CHECK ===")
-    
-    # Use the monitoring flow
-    result = duty_cycle_monitoring_flow()
-    
-    # Log summary
-    status = result["status"]
-    logger.info(f"Scheduled duty cycle check:")
-    logger.info(f"  Usage: {status['current_usage']:.1f}s / 120s ({status['percentage_used']:.1f}%)")
-    logger.info(f"  Mode: {result['recommendation']}")
-    
-    # Alert on very low capacity
-    if status["remaining_capacity"] < 10:
-        logger.warning("🚨 ALERT: Very low duty cycle capacity remaining!")
-    
-    return result
-
-
 @flow  
 def test_sequence_flow(movement_distance: float = 0.5, rest_time: float = 10.0):
     """Prefect flow for automated test sequence"""

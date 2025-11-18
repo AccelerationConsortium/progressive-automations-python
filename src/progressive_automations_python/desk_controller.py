@@ -6,6 +6,14 @@ Handles height calculations, movement planning, and state management.
 """
 
 from typing import Optional
+from progressive_automations_python.config import (
+    DUTY_CYCLE_MAX_ON_TIME,
+    DUTY_CYCLE_PERIOD,
+    LOWEST_HEIGHT,
+    HIGHEST_HEIGHT,
+    UP_RATE,
+    DOWN_RATE
+)
 from progressive_automations_python.duty_cycle import (
     check_movement_against_duty_cycle,
     record_usage_period, 
@@ -13,9 +21,7 @@ from progressive_automations_python.duty_cycle import (
     get_current_duty_cycle_usage,
     show_duty_cycle_status,
     load_state, 
-    save_state,
-    DUTY_CYCLE_MAX_ON_TIME,
-    DUTY_CYCLE_PERIOD
+    save_state
 )
 from progressive_automations_python.movement_control import setup_gpio, cleanup_gpio, move_up, move_down
 
@@ -164,14 +170,7 @@ def generate_safe_movement_suggestions(max_movements: int = 5) -> list:
     
     return suggestions
 
-try:
-    from constants import LOWEST_HEIGHT, HIGHEST_HEIGHT, UP_RATE, DOWN_RATE
-except ImportError:
-    # Fallback values if constants not available
-    LOWEST_HEIGHT = 23.7  # inches
-    HIGHEST_HEIGHT = 54.5  # inches
-    UP_RATE = 0.54  # inches per second
-    DOWN_RATE = 0.55  # inches per second
+
 
 
 def move_to_height(target_height: float, current_height: Optional[float] = None) -> dict:

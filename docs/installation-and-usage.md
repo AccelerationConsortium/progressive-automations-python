@@ -8,6 +8,23 @@ This guide covers the complete installation and usage workflow for the Progressi
 2. **Bill of Materials**: See [Bill of Materials](bill_of_materials.md) for required components
 3. **Raspberry Pi**: Raspberry Pi 5 with Debian Trixie and Python 3.11+
 
+## Configuration
+
+After installation, you can customize duty cycle limits and calibration values by editing the configuration file:
+
+```python
+# Location: site-packages/progressive_automations_python/config.py
+# Or find it with: python -c "import progressive_automations_python.config as c; print(c.__file__)"
+
+# Key settings to adjust during initial setup:
+# - DUTY_CYCLE_PERCENTAGE: Motor duty cycle (default: 0.10 = 10%)
+# - MAX_CONTINUOUS_RUNTIME: Maximum single movement time (default: 30s)
+# - LOWEST_HEIGHT / HIGHEST_HEIGHT: Your desk's physical range
+# - UP_RATE / DOWN_RATE: Measured movement rates (inches/second)
+```
+
+The configuration includes validation to prevent invalid values.
+
 ## Installation
 
 ### Step 1: Install the Package
@@ -53,7 +70,6 @@ This creates the following deployments:
 - `custom-movements-flow/custom-movements` - Execute multiple configured movements
 - `test-sequence-flow/test-sequence` - Test sequence (up, wait, down)
 - `duty-cycle-monitoring-flow/duty-cycle-monitor` - On-demand duty cycle check
-- `scheduled-duty-cycle-check/duty-cycle-monitor-scheduled` - Scheduled monitoring (every 10 min)
 
 ### Step 5: Start a Prefect Worker
 
@@ -403,9 +419,6 @@ progressive_automations_python --test UP|DOWN
 
 # Status check (debugging)
 progressive_automations_python --status
-
-# View Python API examples
-progressive_automations_python --examples
 ```
 
 ## Python API Examples

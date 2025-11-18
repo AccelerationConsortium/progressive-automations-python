@@ -8,17 +8,17 @@ Tracks individual usage periods and enforces both continuous runtime and total u
 import time
 import json
 import os
-from progressive_automations_python.constants import LOWEST_HEIGHT
 from datetime import datetime
 from typing import List, Tuple, Dict, Any, Optional
 
-# Duty cycle constants
-DUTY_CYCLE_PERIOD = 1200  # 20 minutes in seconds
-DUTY_CYCLE_MAX_ON_TIME = 120  # 2 minutes in seconds (10% of 20 minutes)
-DUTY_CYCLE_PERCENTAGE = 0.10  # 10% duty cycle
-MAX_CONTINUOUS_RUNTIME = 30  # Maximum continuous movement time in seconds
-
-STATE_FILE = "lifter_state.json"
+from progressive_automations_python.config import (
+    LOWEST_HEIGHT,
+    DUTY_CYCLE_PERIOD,
+    DUTY_CYCLE_MAX_ON_TIME,
+    DUTY_CYCLE_PERCENTAGE,
+    MAX_CONTINUOUS_RUNTIME,
+    STATE_FILE
+)
 
 
 def load_state():

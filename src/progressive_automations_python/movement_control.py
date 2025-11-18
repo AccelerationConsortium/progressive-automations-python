@@ -10,7 +10,7 @@ from typing import Tuple
 
 try:
     import RPi.GPIO as GPIO
-    from progressive_automations_python.constants import UP_PIN, DOWN_PIN
+    from progressive_automations_python.config import UP_PIN, DOWN_PIN
 except ImportError:
     # For testing without actual GPIO hardware
     class MockGPIO:
@@ -29,9 +29,8 @@ except ImportError:
         def cleanup(): pass
         
     GPIO = MockGPIO()
-    # Use default pins if constants not available (match constants.py)
-    UP_PIN = 18
-    DOWN_PIN = 17
+    # Use default pins if GPIO/config not available
+    from progressive_automations_python.config import UP_PIN, DOWN_PIN
 
 
 def setup_gpio() -> None:
