@@ -1,0 +1,422 @@
+# Installation and Usage Guide
+
+This guide covers the complete installation and usage workflow for the Progressive Automations desk lifter control system.
+
+## Prerequisites
+
+1. **Hardware Setup**: Follow the [Raspberry Pi Setup Guide](raspberry-pi-setup.md) for hardware configuration
+2. **Bill of Materials**: See [Bill of Materials](bill_of_materials.md) for required components
+3. **Raspberry Pi**: Raspberry Pi 5 with Debian Trixie and Python 3.11+
+
+## Installation
+
+### Step 1: Install the Package
+
+```bash
+pip install progressive-automations-python
+```
+
+This installs the package with all dependencies, including Prefect for workflow orchestration.
+
+### Step 2: Configure Prefect Cloud
+
+You need a Prefect Cloud account for remote workflow orchestration.
+
+1. Sign up at [https://www.prefect.io/](https://www.prefect.io/)
+2. Get your API key from the Prefect Cloud dashboard
+3. Login from your Raspberry Pi:
+
+```bash
+prefect cloud login -k <your-api-key>
+```
+
+### Step 3: Deploy Flows to Prefect Cloud
+
+Deploy all desk control flows:
+
+```bash
+progressive_automations_python --deploy
+```
+
+This creates the following deployments:
+- `simple-movement-flow/move-to-position` - Move to a specific height
+- `custom-movements-flow/custom-movements` - Execute multiple configured movements
+- `test-sequence-flow/test-sequence` - Test sequence (up, wait, down)
+- `duty-cycle-monitoring-flow/duty-cycle-monitor` - On-demand duty cycle check
+- `scheduled-duty-cycle-check/duty-cycle-monitor-scheduled` - Scheduled monitoring (every 10 min)
+
+### Step 4: Start a Prefect Worker
+
+On your Raspberry Pi, start a worker to execute flows:
+
+```bash
+prefect worker start --pool default-process-pool
+```
+
+Keep this running in a terminal or as a systemd service.
+
+## Basic Usage
+
+### Test Hardware Connections
+
+Test UP or DOWN movement for 2 seconds:
+
+```bash
+progressive_automations_python --test UP
+progressive_automations_python --test DOWN
+```
+
+### Check Duty Cycle Status
+
+View current duty cycle usage:
+
+```bash
+progressive_automations_python --status
+```
+
+### Move to a Specific Height
+
+Move directly to a target height:
+
+```bash
+# Move to 30 inches (uses last known position)
+progressive_automations_python --move 30.0
+
+# Move from 24 inches to 30 inches
+progressive_automations_python --move 30.0 --current 24.0
+```
+
+### Run a Test Sequence
+
+Execute a test movement (up, wait, down):
+
+```bash
+# Default: move 0.5 inches up, wait 10 seconds, move back down
+progressive_automations_python --test-sequence
+
+# Custom distance and wait time
+progressive_automations_python --test-sequence --distance 1.0 --rest 15.0
+```
+
+## Advanced Usage: Async Deployment and Position Polling
+
+The key feature of this system is the ability to trigger movements asynchronously from external systems and poll their status later.
+
+### Triggering Movements Asynchronously
+
+From any Python environment with network access to Prefect Cloud:
+
+```python
+from prefect.deployments import run_deployment
+
+# Trigger a movement (returns immediately with timeout=0)
+flow_run = run_deployment(
+    name="simple-movement-flow/move-to-position",
+    parameters={"target_height": 35.5, "current_height": 24.0},
+    timeout=0  # Return immediately without waiting
+)
+
+print(f"Movement started with flow run ID: {flow_run.id}")
+# Continue with other work while the desk moves...
+```
+
+### Polling Position Status
+
+Check if the movement has completed:
+
+```python
+from prefect import get_client
+import asyncio
+
+async def check_movement_status(flow_run_id):
+    """Check if the movement has completed"""
+    async with get_client() as client:
+        flow_run = await client.read_flow_run(flow_run_id)
+        
+        print(f"Status: {flow_run.state.type}")
+        
+        if flow_run.state.type == "COMPLETED":
+            # Movement completed successfully
+            result = await flow_run.state.result()
+            print(f"✅ Movement completed!")
+            print(f"  Final position: {result['movement_result']['end_height']}\"")
+            print(f"  At target: {abs(result['movement_result']['end_height'] - result['movement_result']['start_height']) < 0.1}")
+            print(f"  Duty cycle remaining: {result['final_duty_status']['remaining_capacity']:.1f}s")
+            return result
+        elif flow_run.state.type == "FAILED":
+            print(f"❌ Movement failed: {flow_run.state.message}")
+            return None
+        else:
+            print(f"⏳ Still running... (state: {flow_run.state.type})")
+            return None
+
+# Check status
+result = asyncio.run(check_movement_status(flow_run.id))
+```
+
+### Complete Polling Example
+
+Wait for a movement to complete with periodic polling:
+
+```python
+import asyncio
+import time
+
+async def wait_for_movement_completion(flow_run_id, check_interval=5, max_wait=300):
+    """
+    Poll until movement completes or timeout.
+    
+    This is similar to preheating an oven - you set the temperature and check later,
+    not sit in front of it the whole time.
+    
+    Args:
+        flow_run_id: The flow run ID from run_deployment
+        check_interval: Seconds between status checks (default: 5)
+        max_wait: Maximum time to wait in seconds (default: 300)
+        
+    Returns:
+        dict with completion status and result
+    """
+    from prefect import get_client
+    
+    start_time = time.time()
+    
+    async with get_client() as client:
+        while time.time() - start_time < max_wait:
+            flow_run = await client.read_flow_run(flow_run_id)
+            
+            if flow_run.state.is_final():
+                if flow_run.state.type == "COMPLETED":
+                    result = await flow_run.state.result()
+                    return {
+                        "completed": True,
+                        "success": True,
+                        "result": result
+                    }
+                else:
+                    return {
+                        "completed": True,
+                        "success": False,
+                        "error": flow_run.state.message
+                    }
+            
+            print(f"⏳ Still moving... ({time.time() - start_time:.1f}s elapsed)")
+            await asyncio.sleep(check_interval)
+        
+        return {
+            "completed": False,
+            "success": False,
+            "error": "Timeout waiting for movement"
+        }
+
+# Use it
+result = asyncio.run(wait_for_movement_completion(flow_run.id))
+
+if result["completed"] and result["success"]:
+    print(f"✅ Desk reached target position!")
+    print(f"Details: {result['result']}")
+else:
+    print(f"❌ Movement did not complete: {result.get('error', 'Unknown error')}")
+```
+
+### Checking Duty Cycle Before Triggering
+
+Check if there's enough duty cycle capacity before triggering a movement:
+
+```python
+# Check current duty cycle status
+status_run = run_deployment(
+    name="duty-cycle-monitoring-flow/duty-cycle-monitor",
+    timeout=30  # Wait for result
+)
+
+remaining = status_run["status"]["remaining_capacity"]
+
+if remaining > 10:  # Need at least 10 seconds
+    # Safe to trigger movement
+    flow_run = run_deployment(
+        name="simple-movement-flow/move-to-position",
+        parameters={"target_height": 35.5},
+        timeout=0
+    )
+    print(f"Movement triggered: {flow_run.id}")
+else:
+    print(f"⚠️ Insufficient duty cycle capacity ({remaining:.1f}s remaining)")
+    print("Wait for duty cycle window to reset")
+```
+
+## Integration with Other Equipment
+
+When integrating with other equipment that depends on the desk position:
+
+```python
+async def orchestrate_equipment_workflow():
+    """
+    Example: Move desk, wait for completion, then trigger dependent equipment
+    """
+    from prefect.deployments import run_deployment
+    from prefect import get_client
+    import asyncio
+    
+    # Step 1: Trigger desk movement
+    print("Step 1: Moving desk to position...")
+    desk_run = run_deployment(
+        name="simple-movement-flow/move-to-position",
+        parameters={"target_height": 30.0},
+        timeout=0
+    )
+    
+    # Step 2: Poll until desk reaches position
+    print("Step 2: Waiting for desk to reach position...")
+    result = await wait_for_movement_completion(desk_run.id)
+    
+    if not (result["completed"] and result["success"]):
+        raise RuntimeError("Desk movement failed")
+    
+    print(f"✅ Desk at position: {result['result']['movement_result']['end_height']}\"")
+    
+    # Step 3: Now safe to trigger dependent equipment
+    print("Step 3: Triggering dependent equipment...")
+    # ... trigger your other equipment here ...
+    
+    return {"desk_movement": result, "equipment_triggered": True}
+
+# Run the orchestration
+result = asyncio.run(orchestrate_equipment_workflow())
+```
+
+## Duty Cycle Management
+
+The system enforces a 10% duty cycle (2 minutes on, 18 minutes off) to protect the motor:
+
+- **Maximum continuous runtime**: 30 seconds
+- **Maximum usage in 20-minute window**: 120 seconds (2 minutes)
+- **Automatic tracking**: All movements are tracked automatically
+- **Safety enforcement**: Movements exceeding limits are rejected
+
+View current usage:
+
+```bash
+progressive_automations_python --status
+```
+
+Output example:
+```
+=== DUTY CYCLE STATUS ===
+Current usage: 15.2s / 120.0s (12.7%)
+Remaining capacity: 104.8s
+Percentage used: 12.7%
+Window period: 1200s (20 minutes)
+Current position: 24.0"
+Last movement: 2.1s ago
+
+✅ GOOD CAPACITY - Normal operations possible
+```
+
+## Generating Movement Configurations
+
+Generate optimized movement sequences based on current duty cycle:
+
+```bash
+progressive_automations_python --generate-movements
+```
+
+This creates `movement_configs.json` with movements that:
+1. Respect the 30-second continuous runtime limit
+2. Use available capacity efficiently
+3. Demonstrate successful movements within limits
+4. Show duty cycle protection when limits would be exceeded
+
+## Troubleshooting
+
+### Movement Rejected: Insufficient Duty Cycle
+
+**Error**: `Movement would exceed 10% duty cycle limit`
+
+**Solution**: Wait for the duty cycle window to reset. Check status with:
+```bash
+progressive_automations_python --status
+```
+
+### GPIO Permission Denied
+
+**Error**: `Permission denied` when accessing GPIO
+
+**Solution**: Ensure your user is in the `gpio` group:
+```bash
+sudo usermod -a -G gpio $USER
+# Then reboot
+```
+
+### Prefect Worker Not Running
+
+**Error**: Flow triggered but never executes
+
+**Solution**: Ensure a Prefect worker is running:
+```bash
+prefect worker start --pool default-process-pool
+```
+
+Consider setting up a systemd service to keep the worker running.
+
+### Position Unknown
+
+**Error**: `No current height provided and no last known position`
+
+**Solution**: Provide the current height explicitly:
+```bash
+progressive_automations_python --move 30.0 --current 24.0
+```
+
+The system will remember the position for future movements.
+
+## Command Reference
+
+```bash
+# Hardware testing
+progressive_automations_python --test UP|DOWN
+
+# Status and monitoring
+progressive_automations_python --status
+
+# Direct movements
+progressive_automations_python --move TARGET [--current CURRENT]
+progressive_automations_python --test-sequence [--distance DIST] [--rest TIME]
+
+# Prefect deployment
+progressive_automations_python --deploy [--work-pool POOL]
+
+# Utilities
+progressive_automations_python --generate-movements
+progressive_automations_python --examples
+```
+
+## Python API Examples
+
+For viewing complete Python examples for async deployment and polling:
+
+```bash
+progressive_automations_python --examples
+```
+
+This displays comprehensive code examples for:
+- Async movement triggering
+- Status polling
+- Polling loops with timeout
+- Duty cycle checking
+- Equipment workflow orchestration
+
+## Next Steps
+
+1. ✅ Complete hardware setup
+2. ✅ Install package: `pip install progressive-automations-python`
+3. ✅ Configure Prefect Cloud: `prefect cloud login -k <api-key>`
+4. ✅ Deploy flows: `progressive_automations_python --deploy`
+5. ✅ Start worker: `prefect worker start --pool default-process-pool`
+6. ✅ Test: `progressive_automations_python --test UP`
+7. ✅ Integrate with your automation workflow!
+
+For more information, see:
+- [Raspberry Pi Setup](raspberry-pi-setup.md)
+- [Bill of Materials](bill_of_materials.md)
+- [Prefect Documentation](https://docs.prefect.io/)
