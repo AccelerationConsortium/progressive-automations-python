@@ -8,7 +8,7 @@ Tracks individual usage periods and enforces both continuous runtime and total u
 import time
 import json
 import os
-from constants import LOWEST_HEIGHT
+from progressive_automations_python.constants import LOWEST_HEIGHT
 from datetime import datetime
 from typing import List, Tuple, Dict, Any, Optional
 

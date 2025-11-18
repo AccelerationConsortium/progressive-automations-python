@@ -8,7 +8,7 @@ and duty cycle limit protection.
 """
 
 import json
-from desk_controller import check_duty_cycle_status_before_execution, generate_safe_movement_suggestions
+from progressive_automations_python.desk_controller import check_duty_cycle_status_before_execution
 
 def generate_duty_cycle_test_config(output_file: str = "movement_configs.json"):
     """

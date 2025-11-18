@@ -8,14 +8,14 @@ that can be triggered externally and run asynchronously.
 from pathlib import Path
 
 
-def create_deployments(work_pool_name: str = "default-process-pool"):
+def create_deployments(work_pool_name: str = "desk-lifter-pool"):
     """
     Create Prefect deployments for all desk control flows.
     
     This should be run once during setup to register the flows with Prefect Cloud.
     
     Args:
-        work_pool_name: Name of the work pool to use (default: "default-process-pool")
+        work_pool_name: Name of the work pool to use (default: "desk-lifter-pool")
         
     Usage:
         from progressive_automations_python.deployment import create_deployments

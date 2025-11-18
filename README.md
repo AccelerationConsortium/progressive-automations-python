@@ -26,13 +26,13 @@ pip install progressive-automations-python
 
 # 2. Configure Prefect Cloud
 prefect cloud login -k <your-api-key>
-prefect work-pool create default-process-pool --type process
+prefect work-pool create desk-lifter-pool --type process
 
 # 3. Deploy flows
 python -c "from progressive_automations_python.deployment import create_deployments; create_deployments()"
 
 # 4. Start worker on Raspberry Pi
-prefect worker start --pool default-process-pool
+prefect worker start --pool desk-lifter-pool
 ```
 
 ## Usage

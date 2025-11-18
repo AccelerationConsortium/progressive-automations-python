@@ -10,7 +10,7 @@ from typing import Tuple
 
 try:
     import RPi.GPIO as GPIO
-    from constants import UP_PIN, DOWN_PIN
+    from progressive_automations_python.constants import UP_PIN, DOWN_PIN
 except ImportError:
     # For testing without actual GPIO hardware
     class MockGPIO:
