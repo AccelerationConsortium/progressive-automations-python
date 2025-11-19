@@ -14,3 +14,56 @@ except PackageNotFoundError:  # pragma: no cover
     __version__ = "unknown"
 finally:
     del version, PackageNotFoundError
+
+# Export main API
+from progressive_automations_python.config import (
+    LOWEST_HEIGHT,
+    HIGHEST_HEIGHT,
+    UP_RATE,
+    DOWN_RATE,
+    UP_PIN,
+    DOWN_PIN
+)
+
+from progressive_automations_python.desk_controller import (
+    move_to_height,
+    check_duty_cycle_status_before_execution
+)
+
+from progressive_automations_python.duty_cycle import (
+    load_state,
+    save_state,
+    get_duty_cycle_status,
+    show_duty_cycle_status
+)
+
+from progressive_automations_python.prefect_flows import (
+    simple_movement_flow,
+    custom_movements_flow,
+    test_sequence_flow,
+    duty_cycle_monitoring_flow,
+    scheduled_duty_cycle_check
+)
+
+from progressive_automations_python.deployment import (
+    create_deployments
+)
+
+__all__ = [
+    "__version__",
+    "LOWEST_HEIGHT",
+    "HIGHEST_HEIGHT",
+    "UP_RATE",
+    "DOWN_RATE",
+    "UP_PIN",
+    "DOWN_PIN",
+    "move_to_height",
+    "check_duty_cycle_status_before_execution",
+    "load_state",
+    "save_state",
+    "get_duty_cycle_status",
+    "show_duty_cycle_status",
+    "simple_movement_flow",
+    "simple_movement_flow",
+    "create_deployments"
+]
