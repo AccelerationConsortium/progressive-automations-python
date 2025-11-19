@@ -84,7 +84,7 @@ Keep this running in a terminal or set up as a systemd service for automatic sta
 ## Testing During Initial Setup
 
 ```{note}
-The `progressive_automations_python` CLI is for initial hardware testing and troubleshooting. For production use, trigger flows via `run_deployment()` or Prefect's CLI.
+The `progressive_automations_python` CLI is for initial hardware testing and troubleshooting. For production use, trigger flows via `run_deployment()` or Prefect's CLI. The package can also be used standalone, independent of Prefect.
 ```
 
 ### Test Hardware Connections
@@ -441,7 +441,7 @@ This displays comprehensive code examples for:
 2. Install package: `pip install progressive-automations-python`
 3. Configure Prefect Cloud: `prefect cloud login -k <api-key>`
 4. Create work pool: `prefect work-pool create desk-lifter-pool --type process`
-5. Deploy flows via Python: `create_deployments("desk-lifter-pool")`
+5. Deploy flows: `python -c "from progressive_automations_python.deployment import create_deployments; create_deployments('desk-lifter-pool')"`
 6. Start worker: `prefect worker start --pool desk-lifter-pool`
 7. Test hardware (optional): `progressive_automations_python --test UP`
 8. Trigger flows via `run_deployment()` from automation code
