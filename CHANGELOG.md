@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+- 2025-11-19: tests: Add tests/conftest.py to mock RPi.GPIO in CI so pytest can run in non-Raspberry Pi environments. (Fixes job 55770449647)
+
 ## Version 0.1 (development)
 
 - Feature A added
