@@ -42,6 +42,8 @@ jobs:
       - name: Run static analysis and format checkers
         continue-on-error: true
         run: pipx run pre-commit run --all-files --show-diff-on-failure
+      - name: Reset any changes from linting
+        run: git reset --hard HEAD
       - name: Build package distribution files
         run: >-
           pipx run --python '${{ steps.setup-python.outputs.python-path }}'
