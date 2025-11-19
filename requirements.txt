@@ -1,0 +1,3 @@
+# Core dependencies for desk lifter control
+prefect>=2.0.0
+rpi-lgpio
