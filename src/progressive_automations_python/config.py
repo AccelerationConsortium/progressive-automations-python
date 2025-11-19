@@ -95,3 +95,24 @@ def validate_config():
 
 # Validate on import
 validate_config()
+
+
+# =============================================================================
+# SMOKE TEST PARAMETERS
+# =============================================================================
+# Quick test parameters for initial validation and debugging
+# These are NOT used in production - only for manual testing
+
+SMOKE_TEST = {
+    # Small movement for quick testing (inches)
+    "movement_distance": 0.5,
+    
+    # Short wait time for test sequences (seconds)
+    "rest_time": 5.0,
+    
+    # Test target heights within safe range
+    "test_heights": [24.0, 25.0, 24.5],
+    
+    # Quick duty cycle test (uses minimal capacity)
+    "quick_cycle_test": True
+}

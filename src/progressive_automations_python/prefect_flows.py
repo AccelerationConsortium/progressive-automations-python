@@ -21,15 +21,19 @@ check_duty_cycle_status_task = task(check_duty_cycle_status_before_execution)
 
 @flow
 def simple_movement_flow(target_height: float):
-    """Prefect flow for moving desk to a specific height with duty cycle management"""
+    """Prefect flow for moving desk to a specific height with duty cycle management
+    
+    Movement will execute even if duty cycle capacity is full - it will wait as needed.
+    """
     logger = get_run_logger()
     logger.info(f"=== SIMPLE MOVEMENT FLOW ===")
     logger.info(f"Target: {target_height}\"")
     
-    # Check duty cycle status and calculate requirements
+    # Check duty cycle status
     initial_status = check_duty_cycle_status_task()
+    logger.info(f"Initial duty cycle: {initial_status['current_usage']:.1f}s / {initial_status['window_period']}s used")
     
-    # Get current position and calculate movement requirements
+    # Get current position
     state = load_state()
     current_height = state.get("last_position")
     
@@ -37,16 +41,18 @@ def simple_movement_flow(target_height: float):
         logger.error("❌ MOVEMENT ABORTED: No last known position")
         raise ValueError("No last known position in state file")
     
-    # Check if movement is possible
+    # Check movement requirements
     check_result = check_movement_against_duty_cycle(target_height, current_height, UP_RATE, DOWN_RATE)
     
     if not check_result["allowed"]:
-        # Calculate wait time needed
+        # Movement not immediately possible - will wait
         wait_time = check_result.get("wait_time_needed", 0)
-        logger.error(f"❌ MOVEMENT ABORTED: {check_result['error']}")
-        if wait_time > 0:
-            logger.info(f"Estimated wait time: {wait_time:.1f}s")
-        raise ValueError(f"{check_result['error']}. Wait time needed: {wait_time:.1f}s")
+        logger.warning(f"⏳ Duty cycle capacity insufficient - will wait {wait_time:.1f}s before movement")
+        
+        # Wait for duty cycle to free up
+        import time
+        time.sleep(wait_time)
+        logger.info(f"✅ Wait complete - proceeding with movement")
     
     # Execute the movement
     result = move_to_height_task(target_height)
@@ -62,7 +68,8 @@ def simple_movement_flow(target_height: float):
         **result,
         "initial_duty_status": initial_status,
         "final_duty_status": final_status,
-        "capacity_used": capacity_used
+        "capacity_used": capacity_used,
+        "wait_time": check_result.get("wait_time_needed", 0) if not check_result["allowed"] else 0
     }
 
 
