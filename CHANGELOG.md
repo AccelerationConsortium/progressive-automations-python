@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Fixed
+- 2025-11-19: Fixed ImportError by removing non-existent flow imports (custom_movements_flow, test_sequence_flow, duty_cycle_monitoring_flow, scheduled_duty_cycle_check) from src/progressive_automations_python/__init__.py. These flows only exist in scripts/prefect_flows.py, not in the package module. (Fixes job 55773363544)
 - 2025-11-19: tests: Add tests/conftest.py to mock RPi.GPIO in CI so pytest can run in non-Raspberry Pi environments. (Fixes job 55770449647)
 
 ## Version 0.1 (development)
