@@ -33,13 +33,17 @@ jobs:
       wheel-distribution: ${{ steps.wheel-distribution.outputs.path }}
     steps:
       - uses: actions/checkout@v4
-        with: {fetch-depth: 0}  # deep clone for setuptools-scm
+        with:
+          fetch-depth: 0  # deep clone for setuptools-scm
+          ref: ${{ github.ref }}  # ensure tags are checked out correctly
       - uses: actions/setup-python@v5
         id: setup-python
         with: {python-version: "3.12"}
       - name: Run static analysis and format checkers
         continue-on-error: true
         run: pipx run pre-commit run --all-files --show-diff-on-failure
+      - name: Reset any changes from linting
+        run: git reset --hard HEAD
       - name: Build package distribution files
         run: >-
           pipx run --python '${{ steps.setup-python.outputs.python-path }}'

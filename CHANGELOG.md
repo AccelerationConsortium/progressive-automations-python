@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Fixed
+- 2025-11-19: Fixed PyPI version generation to produce clean version numbers (e.g., 0.1.3) instead of post/dev suffixes (e.g., 0.1.3.post1.dev0) when creating releases via GitHub UI by: (1) ensuring the CI workflow checks out the exact tag commit, and (2) resetting any uncommitted changes from linting before building to avoid setuptools_scm detecting a dirty repository.
 - 2025-11-19: Fixed ImportError by removing non-existent flow imports (custom_movements_flow, test_sequence_flow, duty_cycle_monitoring_flow, scheduled_duty_cycle_check) from src/progressive_automations_python/__init__.py. These flows only exist in scripts/prefect_flows.py, not in the package module. (Fixes job 55773363544)
 - 2025-11-19: tests: Add tests/conftest.py to mock RPi.GPIO in CI so pytest can run in non-Raspberry Pi environments. (Fixes job 55770449647)
 
