@@ -38,9 +38,9 @@ def create_deployments(work_pool_name: str = "desk-lifter-pool"):
         work_pool_name=work_pool_name,
         description="Move desk to a specific height position with duty cycle management"
     )
-    print(f"✓ Deployed 'simple-movement-flow/move-to-position'")
+    print(f"Deployed 'simple-movement-flow/move-to-position'")
     
-    print(f"\n🎉 Deployment created successfully!")
+    print(f"\nDeployment created successfully.")
     print(f"\nNext steps:")
     print(f"1. Start a worker: prefect worker start --pool {work_pool_name}")
     print(f"2. Trigger a flow from Python:")

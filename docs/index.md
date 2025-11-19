@@ -1,18 +1,6 @@
 # progressive-automations-python
 
-Python package for programmatically controlling progressive automations tools (e.g., LG-07 modular lifting column via FLTCON).
-
-
-## Note
-
-> This is the main page of your project's [Sphinx] documentation. It is
-> formatted in [Markdown]. Add additional pages by creating md-files in
-> `docs` or rst-files (formatted in [reStructuredText]) and adding links to
-> them in the `Contents` section below.
->
-> Please check [Sphinx] and [MyST] for more information
-> about how to document your project and how to configure your preferences.
-
+Python package for programmatically controlling Progressive Automations desk lifters (e.g., LG-07 modular lifting column via FLTCON) with Prefect workflow orchestration.
 
 ## Contents
 
