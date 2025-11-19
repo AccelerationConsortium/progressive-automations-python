@@ -2,24 +2,59 @@ import time
 import json
 import os
 from datetime import datetime, timedelta
+from collections import deque
 from prefect import flow, task
 from prefect.logging import get_run_logger
 import RPi.GPIO as GPIO
-from constants import UP_PIN, DOWN_PIN
+from constants import (
+    LOWEST_HEIGHT,
+    HIGHEST_HEIGHT,
+    UP_RATE,
+    DOWN_RATE,
+    STATE_FILE,
+    DUTY_CYCLE_PERIOD,
+    DUTY_CYCLE_MAX_ON_TIME,
+    MAX_CONTINUOUS_RUNTIME,
+    DUTY_CYCLE_PERCENTAGE,
+    UP_PIN,
+    DOWN_PIN
+)
 
-# Calibration data
-LOWEST_HEIGHT = 23.7  # inches
-HIGHEST_HEIGHT = 54.5  # inches
-UP_RATE = 0.54  # inches per second
-DOWN_RATE = 0.55  # inches per second
 
-STATE_FILE = "lifter_state.json"
-DUTY_CYCLE_PERIOD = 1200  # 20 minutes in seconds
-DUTY_CYCLE_MAX_ON_TIME = 120  # 2 minutes in seconds (10% of 20 minutes)
-DUTY_CYCLE_PERCENTAGE = 0.10  # 10% duty cycle
-MAX_CONTINUOUS_RUNTIME = 30  # Maximum continuous movement time in seconds
+
+# Global queue to track ON periods (start_time, end_time)
+on_periods_queue = deque()
 
 GPIO.setmode(GPIO.BCM)
+
+@task
+def clean_old_periods():
+    """Remove ON periods outside the 20-minute duty cycle window"""
+    current_time = time.time()
+    while on_periods_queue and on_periods_queue[0][1] < current_time - DUTY_CYCLE_PERIOD:
+        on_periods_queue.popleft()
+
+@task
+def get_current_usage():
+    """Get current duty cycle usage in seconds"""
+    clean_old_periods()
+    return sum(end - start for start, end in on_periods_queue)
+
+@task
+def get_remaining_duty_time():
+    """Get remaining duty cycle time in seconds"""
+    current_usage = get_current_usage()
+    return max(0, DUTY_CYCLE_MAX_ON_TIME - current_usage)
+
+@task
+def can_run_for_duration(duration):
+    """Check if we can run for the specified duration without exceeding duty cycle"""
+    return get_remaining_duty_time() >= duration
+
+@task
+def record_on_period(start_time, end_time):
+    """Record an ON period in the duty cycle queue"""
+    on_periods_queue.append((start_time, end_time))
 
 @task
 def setup_gpio():
@@ -62,7 +97,8 @@ def load_state():
     return {
         "total_up_time": 0.0,
         "last_position": None,
-        "usage_periods": []  # List of [start_timestamp, end_timestamp, duration] entries
+        "last_reset_time": datetime.now().isoformat(),
+        "current_window_usage": 0.0
     }
 
 @task
@@ -72,70 +108,39 @@ def save_state(state):
         json.dump(state, f, indent=2)
 
 @task
-def clean_old_usage_periods(state):
-    """Remove usage periods older than the duty cycle period"""
-    current_time = time.time()
-    cutoff_time = current_time - DUTY_CYCLE_PERIOD
-    
-    # Keep only periods that end after the cutoff time
-    state["usage_periods"] = [
-        period for period in state["usage_periods"] 
-        if period[1] > cutoff_time  # period[1] is end_timestamp
-    ]
-    return state
-
-@task
-def get_current_duty_cycle_usage(state):
-    """Calculate current duty cycle usage in the sliding window"""
-    clean_old_usage_periods(state)
-    current_time = time.time()
-    
-    total_usage = 0.0
-    for start_time, end_time, duration in state["usage_periods"]:
-        # Only count usage that's within the duty cycle period
-        window_start = current_time - DUTY_CYCLE_PERIOD
-        
-        # Adjust start and end times to the current window
-        effective_start = max(start_time, window_start)
-        effective_end = min(end_time, current_time)
-        
-        if effective_end > effective_start:
-            total_usage += effective_end - effective_start
-    
-    return total_usage
-
-@task
-def get_remaining_duty_time(state):
-    """Get remaining duty cycle time in seconds"""
-    current_usage = get_current_duty_cycle_usage(state)
-    return max(0, DUTY_CYCLE_MAX_ON_TIME - current_usage)
-
-@task
-def record_usage_period(state, start_time, end_time, duration):
-    """Record a usage period in the duty cycle tracking"""
-    state["usage_periods"].append([start_time, end_time, duration])
-    return state
-
-@task
-def check_timing_limits(state, required_time):
-    """Check if the movement is within duty cycle limits using sliding window"""
+def check_timing_limits(required_time):
+    """Check if the movement is within duty cycle limits using queue"""
     logger = get_run_logger()
-    
-    # Clean old periods and get current usage
-    state = clean_old_usage_periods(state)
-    current_usage = get_current_duty_cycle_usage(state)
     
     # Check continuous runtime limit
     if required_time > MAX_CONTINUOUS_RUNTIME:
         raise ValueError(f"Movement duration {required_time:.1f}s exceeds maximum continuous runtime of {MAX_CONTINUOUS_RUNTIME}s")
     
-    # Check if adding this movement would exceed the duty cycle limit
-    if current_usage + required_time > DUTY_CYCLE_MAX_ON_TIME:
-        remaining_time = DUTY_CYCLE_MAX_ON_TIME - current_usage
-        raise ValueError(f"Movement would exceed {DUTY_CYCLE_PERCENTAGE*100:.0f}% duty cycle limit. Current usage: {current_usage:.1f}s, Remaining: {remaining_time:.1f}s in {DUTY_CYCLE_PERIOD}s window")
+    # Check duty cycle
+    remaining_time = get_remaining_duty_time()
     
-    logger.info(f"Duty cycle OK: {current_usage:.1f}s + {required_time:.1f}s <= {DUTY_CYCLE_MAX_ON_TIME}s ({DUTY_CYCLE_PERCENTAGE*100:.0f}% of {DUTY_CYCLE_PERIOD}s)")
-    return True, state
+    if remaining_time >= required_time:
+        logger.info(f"Duty cycle OK: {remaining_time:.1f}s remaining, requesting {required_time:.1f}s")
+        logger.info(f"Continuous runtime OK: {required_time:.1f}s <= {MAX_CONTINUOUS_RUNTIME}s limit")
+        return True
+    else:
+        wait_time = required_time - remaining_time
+        raise ValueError(f"Movement would exceed duty cycle limit. Need to wait {wait_time:.1f}s more")
+
+@task
+def wait_for_duty_cycle(required_duration):
+    """Wait until duty cycle allows for the required duration"""
+    logger = get_run_logger()
+    
+    while True:
+        remaining = get_remaining_duty_time()
+        if remaining >= required_duration:
+            logger.info(f"Duty cycle ready: {remaining:.1f}s available")
+            break
+        
+        wait_time = required_duration - remaining
+        logger.info(f"Waiting {wait_time:.1f}s for duty cycle...")
+        time.sleep(min(wait_time, 30))  # Check every 30s max
 
 @task
 def move_up(up_time):
@@ -149,10 +154,10 @@ def move_up(up_time):
     time.sleep(up_time)
     release_up()
     end_time = time.time()
-    actual_duration = end_time - start_time
     
-    logger.info(f"UP movement completed: {actual_duration:.1f}s actual")
-    return start_time, end_time, actual_duration
+    # Record the actual ON period
+    record_on_period(start_time, end_time)
+    logger.info(f"UP movement completed: {end_time - start_time:.1f}s actual")
 
 @task
 def move_down(down_time):
@@ -166,14 +171,56 @@ def move_down(down_time):
     time.sleep(down_time)
     release_down()
     end_time = time.time()
-    actual_duration = end_time - start_time
     
-    logger.info(f"DOWN movement completed: {actual_duration:.1f}s actual")
-    return start_time, end_time, actual_duration
+    # Record the actual ON period
+    record_on_period(start_time, end_time)
+    logger.info(f"DOWN movement completed: {end_time - start_time:.1f}s actual")
 
-@flow
+@task
+def move_with_chunking(direction: str, total_time: float, rest_between_chunks: float = 2.0):
+    """Move in chunks if total time exceeds continuous runtime limit"""
+    logger = get_run_logger()
+    
+    if total_time <= MAX_CONTINUOUS_RUNTIME:
+        # Single movement is fine
+        if direction.lower() == "up":
+            move_up(total_time)
+        else:
+            move_down(total_time)
+        return
+    
+    # Break into chunks
+    chunks = []
+    remaining = total_time
+    
+    while remaining > 0:
+        chunk_size = min(remaining, MAX_CONTINUOUS_RUNTIME)
+        chunks.append(chunk_size)
+        remaining -= chunk_size
+    
+    logger.info(f"Breaking {total_time:.1f}s movement into {len(chunks)} chunks: {[f'{c:.1f}s' for c in chunks]}")
+    
+    for i, chunk_time in enumerate(chunks):
+        logger.info(f"Executing chunk {i+1}/{len(chunks)}: {chunk_time:.1f}s")
+        
+        # Check duty cycle before each chunk
+        check_timing_limits(chunk_time)
+        
+        # Execute chunk
+        if direction.lower() == "up":
+            move_up(chunk_time)
+        else:
+            move_down(chunk_time)
+        
+        # Rest between chunks (except after last chunk)
+        if i < len(chunks) - 1:
+            logger.info(f"Resting {rest_between_chunks:.1f}s between chunks...")
+            time.sleep(rest_between_chunks)
+
+#@flow
+@task
 def move_to_height_flow(target_height: float, current_height: float):
-    """Main flow to move desk to target height with safety checks"""
+    """Main flow to move desk to target height with queue-based duty cycle enforcement"""
     logger = get_run_logger()
     
     # Validate height range
@@ -197,41 +244,28 @@ def move_to_height_flow(target_height: float, current_height: float):
             # Moving up
             up_time = delta / UP_RATE
             
-            # Check timing limits
-            is_valid, updated_state = check_timing_limits(state, up_time)
-            state = updated_state
+            # Use chunking for long movements
+            move_with_chunking("up", up_time)
             
-            # Execute movement and get actual timing
-            start_time, end_time, actual_duration = move_up(up_time)
-            
-            # Record the usage period and update state
-            state = record_usage_period(state, start_time, end_time, actual_duration)
-            state["total_up_time"] += actual_duration
+            # Update state
+            state["total_up_time"] += up_time
         else:
             # Moving down
             down_time = abs(delta) / DOWN_RATE
             
-            # Check timing limits
-            is_valid, updated_state = check_timing_limits(state, down_time)
-            state = updated_state
-            
-            # Execute movement and get actual timing
-            start_time, end_time, actual_duration = move_down(down_time)
-            
-            # Record the usage period (down time counts toward duty cycle but not total_up_time)
-            state = record_usage_period(state, start_time, end_time, actual_duration)
+            # Use chunking for long movements
+            move_with_chunking("down", down_time)
         
         # Update position and save state
         state["last_position"] = target_height
         save_state(state)
         
-        # Get current duty cycle info for logging
-        current_usage = get_current_duty_cycle_usage(state)
-        remaining_time = get_remaining_duty_time(state)
+        current_usage = get_current_usage()
+        remaining_duty = get_remaining_duty_time()
         
         logger.info(f"Arrived at {target_height}'' (approximate). State saved.")
-        logger.info(f"Duty cycle usage: {current_usage:.1f}s / {DUTY_CYCLE_MAX_ON_TIME}s ({current_usage/DUTY_CYCLE_MAX_ON_TIME*100:.1f}%)")
-        logger.info(f"Remaining duty time: {remaining_time:.1f}s")
+        logger.info(f"Current duty cycle usage: {current_usage:.1f}s / {MAX_ON_TIME}s")
+        logger.info(f"Remaining duty time: {remaining_duty:.1f}s")
         logger.info(f"Total up time: {state['total_up_time']:.1f}s")
         
     finally:
@@ -289,7 +323,7 @@ if __name__ == "__main__":
         ).deploy(
             name="desk-lifter-test-sequence-1139pm-toronto",
             work_pool_name="default-agent-pool",
-            cron="39 4 * * *",  # Run daily at 11:39 PM Toronto time (4:39 AM UTC)
+            #cron="39 4 * * *",  # Run daily at 11:39 PM Toronto time (4:39 AM UTC)
         )
         print("Deployment created! Run 'prefect worker start --pool default-agent-pool' to execute scheduled flows.")
     elif len(sys.argv) > 1 and sys.argv[1] == "test":

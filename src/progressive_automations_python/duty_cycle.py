@@ -70,7 +70,10 @@ def get_current_duty_cycle_usage(state: Dict[str, Any]) -> float:
     current_time = time.time()
     
     total_usage = 0.0
-    for start_time, end_time, duration in state["usage_periods"]:
+    for period in state["usage_periods"]:
+        # Handle both old format [start, end, duration] and new format [start, end]
+        start_time, end_time = period[0], period[1]
+        
         # Only count usage that's within the duty cycle period
         window_start = current_time - DUTY_CYCLE_PERIOD
         
@@ -84,9 +87,9 @@ def get_current_duty_cycle_usage(state: Dict[str, Any]) -> float:
     return total_usage
 
 
-def record_usage_period(state: Dict[str, Any], start_time: float, end_time: float, duration: float) -> Dict[str, Any]:
+def record_usage_period(state: Dict[str, Any], start_time: float, end_time: float) -> Dict[str, Any]:
     """Record a usage period in the duty cycle tracking"""
-    state["usage_periods"].append([start_time, end_time, duration])
+    state["usage_periods"].append([start_time, end_time])
     return state
 
 

@@ -137,7 +137,7 @@ def move_to_height(target_height: float) -> dict:
     start_time, end_time, actual_duration = move_func(required_time)
     
     # Record the usage period and update state
-    state = record_usage_period(state, start_time, end_time, actual_duration)
+    state = record_usage_period(state, start_time, end_time)
     if delta > 0:
         state["total_up_time"] += actual_duration
     
