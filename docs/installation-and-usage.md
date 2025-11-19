@@ -83,7 +83,9 @@ Keep this running in a terminal or set up as a systemd service for automatic sta
 
 ## Testing During Initial Setup
 
-> **Note**: The `progressive_automations_python` CLI is provided for initial hardware testing and troubleshooting only. For production use, trigger flows via `run_deployment()` or Prefect's CLI.
+```{note}
+The `progressive_automations_python` CLI is for initial hardware testing and troubleshooting. For production use, trigger flows via `run_deployment()` or Prefect's CLI.
+```
 
 ### Test Hardware Connections
 
