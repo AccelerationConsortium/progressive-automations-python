@@ -20,11 +20,13 @@ Python package for programmatically controlling progressive automations tools (e
 :maxdepth: 2
 
 Overview <readme>
+Installation and Usage <installation-and-usage>
+Raspberry Pi Setup <raspberry-pi-setup>
+Bill of Materials <bill_of_materials>
 Contributions & Help <contributing>
 License <license>
 Authors <authors>
 Changelog <changelog>
-Bill of Materials <bill_of_materials>
 Module Reference <api/modules>
 ```
 
