@@ -1,11 +1,9 @@
 """
-Simplified Prefect flows for automated desk control.
+Prefect flow for desk lifter control.
 
-Provides scheduled automation and workflow orchestration using Prefect.
-Directly decorates core functions from desk_controller for task execution.
+Provides workflow orchestration using Prefect for remote desk control.
 """
 
-import time
 from prefect import flow, task
 from prefect.logging import get_run_logger
 
@@ -13,38 +11,42 @@ from progressive_automations_python.desk_controller import (
     move_to_height, 
     check_duty_cycle_status_before_execution
 )
-from progressive_automations_python.testing import (
-    test_sequence,
-    execute_custom_movements
-)
-from progressive_automations_python.config import LOWEST_HEIGHT
-from progressive_automations_python.duty_cycle import get_duty_cycle_status, load_state
+from progressive_automations_python.duty_cycle import check_movement_against_duty_cycle, load_state
+from progressive_automations_python.config import UP_RATE, DOWN_RATE
 
 # Decorate core functions as tasks
 move_to_height_task = task(move_to_height)
-test_sequence_task = task(test_sequence)
-execute_custom_movements_task = task(execute_custom_movements)
 check_duty_cycle_status_task = task(check_duty_cycle_status_before_execution)
 
 
-# =============================================================================
-# FLOWS
-# =============================================================================
-
 @flow
 def simple_movement_flow(target_height: float):
-    """Simple Prefect flow for moving to a specific height with duty cycle checking"""
+    """Prefect flow for moving desk to a specific height with duty cycle management"""
     logger = get_run_logger()
     logger.info(f"=== SIMPLE MOVEMENT FLOW ===")
     logger.info(f"Target: {target_height}\"")
     
-    # Check duty cycle status
+    # Check duty cycle status and calculate requirements
     initial_status = check_duty_cycle_status_task()
     
-    # Abort if insufficient capacity
-    if initial_status["remaining_capacity"] < 1.0:
-        logger.error("❌ MOVEMENT ABORTED: Insufficient duty cycle capacity")
-        raise ValueError("Insufficient duty cycle capacity - must wait for reset")
+    # Get current position and calculate movement requirements
+    state = load_state()
+    current_height = state.get("last_position")
+    
+    if current_height is None:
+        logger.error("❌ MOVEMENT ABORTED: No last known position")
+        raise ValueError("No last known position in state file")
+    
+    # Check if movement is possible
+    check_result = check_movement_against_duty_cycle(target_height, current_height, UP_RATE, DOWN_RATE)
+    
+    if not check_result["allowed"]:
+        # Calculate wait time needed
+        wait_time = check_result.get("wait_time_needed", 0)
+        logger.error(f"❌ MOVEMENT ABORTED: {check_result['error']}")
+        if wait_time > 0:
+            logger.info(f"Estimated wait time: {wait_time:.1f}s")
+        raise ValueError(f"{check_result['error']}. Wait time needed: {wait_time:.1f}s")
     
     # Execute the movement
     result = move_to_height_task(target_height)
@@ -61,75 +63,6 @@ def simple_movement_flow(target_height: float):
         "initial_duty_status": initial_status,
         "final_duty_status": final_status,
         "capacity_used": capacity_used
-    }
-
-
-@flow
-def custom_movements_flow(config_file: str = "movement_configs.json"):
-    """Flow to execute custom movements from configuration file"""
-    logger = get_run_logger()
-    logger.info("=== CUSTOM MOVEMENTS FLOW ===")
-    
-    # Execute custom movements
-    result = execute_custom_movements_task(config_file)
-    
-    logger.info("Custom movements flow completed")
-    return result
-
-
-@flow
-def duty_cycle_monitoring_flow():
-    """Flow for monitoring duty cycle status"""
-    logger = get_run_logger()
-    logger.info("=== DUTY CYCLE MONITORING FLOW ===")
-    
-    # Check duty cycle status
-    status = check_duty_cycle_status_task()
-    
-    # Simple recommendation logic
-    remaining = status["remaining_capacity"]
-    
-    if remaining < 5:
-        recommendation = "wait"
-        logger.warning("⚠️ VERY LOW CAPACITY - Recommend waiting for duty cycle reset")
-    elif remaining < 15:
-        recommendation = "small_movements_only"
-        logger.warning("⚠️ LOW CAPACITY - Use small movements only")
-    elif remaining < 60:
-        recommendation = "moderate_planning"
-        logger.info("✅ MODERATE CAPACITY - Plan movements carefully")
-    else:
-        recommendation = "normal_operations"
-        logger.info("✅ GOOD CAPACITY - Normal operations possible")
-    
-    return {
-        "status": status,
-        "recommendation": recommendation,
-        "operational_mode": recommendation
-    }
-
-
-@flow  
-def test_sequence_flow(movement_distance: float = 0.5, rest_time: float = 10.0):
-    """Prefect flow for automated test sequence"""
-    logger = get_run_logger()
-    logger.info(f"=== TEST SEQUENCE FLOW ===")
-    logger.info(f"Distance: {movement_distance}\", Rest: {rest_time}s")
-    
-    # Check duty cycle before starting
-    initial_status = check_duty_cycle_status_task()
-    
-    # Execute test sequence
-    result = test_sequence_task(movement_distance, rest_time)
-    
-    # Check final status
-    final_status = check_duty_cycle_status_task()
-    
-    logger.info("Test sequence flow completed")
-    return {
-        **result,
-        "initial_duty_status": initial_status,
-        "final_duty_status": final_status
     }
 
 

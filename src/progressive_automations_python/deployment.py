@@ -10,9 +10,9 @@ from pathlib import Path
 
 def create_deployments(work_pool_name: str = "desk-lifter-pool"):
     """
-    Create Prefect deployments for all desk control flows.
+    Create Prefect deployment for desk control.
     
-    This should be run once during setup to register the flows with Prefect Cloud.
+    This should be run once during setup to register the flow with Prefect Cloud.
     
     Args:
         work_pool_name: Name of the work pool to use (default: "desk-lifter-pool")
@@ -21,18 +21,13 @@ def create_deployments(work_pool_name: str = "desk-lifter-pool"):
         from progressive_automations_python.deployment import create_deployments
         create_deployments("my-work-pool")
     """
-    from progressive_automations_python.prefect_flows import (
-        simple_movement_flow,
-        custom_movements_flow,
-        test_sequence_flow,
-        duty_cycle_monitoring_flow
-    )
+    from progressive_automations_python.prefect_flows import simple_movement_flow
     
     # Get the source directory (where the package is installed)
     source_dir = Path(__file__).parent
     
-    print(f"Creating deployments with work pool: {work_pool_name}")
-    print("=== DEPLOYING ALL DESK CONTROL FLOWS ===")
+    print(f"Creating deployment with work pool: {work_pool_name}")
+    print("=== DEPLOYING DESK CONTROL FLOW ===")
     
     # Deploy simple movement flow
     simple_movement_flow.from_source(
@@ -45,40 +40,7 @@ def create_deployments(work_pool_name: str = "desk-lifter-pool"):
     )
     print(f"✓ Deployed 'simple-movement-flow/move-to-position'")
     
-    # Deploy custom movements flow
-    custom_movements_flow.from_source(
-        source=str(source_dir.parent.parent),
-        entrypoint="progressive_automations_python/prefect_flows.py:custom_movements_flow",
-    ).deploy(
-        name="custom-movements",
-        work_pool_name=work_pool_name,
-        description="Execute custom movements from configuration file"
-    )
-    print(f"✓ Deployed 'custom-movements-flow/custom-movements'")
-    
-    # Deploy test sequence flow
-    test_sequence_flow.from_source(
-        source=str(source_dir.parent.parent),
-        entrypoint="progressive_automations_python/prefect_flows.py:test_sequence_flow",
-    ).deploy(
-        name="test-sequence",
-        work_pool_name=work_pool_name,
-        description="Execute a test movement sequence"
-    )
-    print(f"✓ Deployed 'test-sequence-flow/test-sequence'")
-    
-    # Deploy duty cycle monitoring
-    duty_cycle_monitoring_flow.from_source(
-        source=str(source_dir.parent.parent),
-        entrypoint="progressive_automations_python/prefect_flows.py:duty_cycle_monitoring_flow",
-    ).deploy(
-        name="duty-cycle-monitor",
-        work_pool_name=work_pool_name,
-        description="Check duty cycle status on demand"
-    )
-    print(f"✓ Deployed 'duty-cycle-monitoring-flow/duty-cycle-monitor'")
-    
-    print(f"\n🎉 All deployments created successfully!")
+    print(f"\n🎉 Deployment created successfully!")
     print(f"\nNext steps:")
     print(f"1. Start a worker: prefect worker start --pool {work_pool_name}")
     print(f"2. Trigger a flow from Python:")

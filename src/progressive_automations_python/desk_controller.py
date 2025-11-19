@@ -96,76 +96,73 @@ def move_to_height(target_height: float) -> dict:
     # Setup GPIO
     setup_gpio()
     
-    try:
-        # Load current state
-        state = load_state()
-        
-        # Get current height from state
-        if state["last_position"] is None:
-            raise ValueError("No last known position in state file. Initialize position first.")
-        
-        current_height = state["last_position"]
-        
-        # Calculate movement requirements
-        delta = target_height - current_height
-        if abs(delta) < 0.01:
-            print(f"Already at {target_height}'' (within tolerance). No movement needed.")
-            return {
-                "success": True,
-                "movement": "none",
-                "message": f"Already at target height {target_height}''",
-                "duty_cycle": get_duty_cycle_status(state)
-            }
-        
-        # Determine direction and calculate time
-        direction = "up" if delta > 0 else "down"
-        rate = UP_RATE if delta > 0 else DOWN_RATE
-        required_time = abs(delta) / rate
-        
-        # Check duty cycle limits
-        check_result = check_movement_against_duty_cycle(target_height, current_height, UP_RATE, DOWN_RATE)
-        
-        if not check_result["allowed"]:
-            raise ValueError(check_result["error"])
-        
-        print(f"Duty cycle OK: {check_result['current_usage']:.1f}s + {check_result['estimated_duration']:.1f}s <= {DUTY_CYCLE_MAX_ON_TIME}s")
-        
-        # Execute movement
-        move_func = move_up if delta > 0 else move_down
-        start_time, end_time, actual_duration = move_func(required_time)
-        
-        # Record the usage period and update state
-        state = record_usage_period(state, start_time, end_time, actual_duration)
-        if delta > 0:
-            state["total_up_time"] += actual_duration
-        
-        # Update position and save state
-        state["last_position"] = target_height
-        save_state(state)
-        
-        # Get final duty cycle info
-        duty_status = get_duty_cycle_status(state)
-        
-        print(f"Arrived at {target_height}'' (approximate). State saved.")
-        print(f"Duty cycle usage: {duty_status['current_usage']:.1f}s / {duty_status['max_usage']}s ({duty_status['percentage_used']:.1f}%)")
-        print(f"Remaining duty time: {duty_status['remaining_time']:.1f}s")
-        print(f"Total up time: {state['total_up_time']:.1f}s")
-        
+    # Load current state
+    state = load_state()
+    
+    # Get current height from state
+    if state["last_position"] is None:
+        cleanup_gpio()
+        raise ValueError("No last known position in state file. Initialize position first.")
+    
+    current_height = state["last_position"]
+    
+    # Calculate movement requirements
+    delta = target_height - current_height
+    if abs(delta) < 0.01:
+        cleanup_gpio()
+        print(f"Already at {target_height}'' (within tolerance). No movement needed.")
         return {
             "success": True,
-            "movement": direction,
-            "start_height": current_height,
-            "end_height": target_height,
-            "distance": abs(delta),
-            "duration": actual_duration,
-            "duty_cycle": duty_status,
-            "total_up_time": state["total_up_time"]
+            "movement": "none",
+            "message": f"Already at target height {target_height}''",
+            "duty_cycle": get_duty_cycle_status(state)
         }
-        
-    except Exception as e:
-        # Re-raise the exception instead of returning error dict
-        raise
-        
-    finally:
-        # Always clean up GPIO
+    
+    # Determine direction and calculate time
+    direction = "up" if delta > 0 else "down"
+    rate = UP_RATE if delta > 0 else DOWN_RATE
+    required_time = abs(delta) / rate
+    
+    # Check duty cycle limits
+    check_result = check_movement_against_duty_cycle(target_height, current_height, UP_RATE, DOWN_RATE)
+    
+    if not check_result["allowed"]:
         cleanup_gpio()
+        raise ValueError(check_result["error"])
+    
+    print(f"Duty cycle OK: {check_result['current_usage']:.1f}s + {check_result['estimated_duration']:.1f}s <= {DUTY_CYCLE_MAX_ON_TIME}s")
+    
+    # Execute movement
+    move_func = move_up if delta > 0 else move_down
+    start_time, end_time, actual_duration = move_func(required_time)
+    
+    # Record the usage period and update state
+    state = record_usage_period(state, start_time, end_time, actual_duration)
+    if delta > 0:
+        state["total_up_time"] += actual_duration
+    
+    # Update position and save state
+    state["last_position"] = target_height
+    save_state(state)
+    
+    # Get final duty cycle info
+    duty_status = get_duty_cycle_status(state)
+    
+    print(f"Arrived at {target_height}'' (approximate). State saved.")
+    print(f"Duty cycle usage: {duty_status['current_usage']:.1f}s / {duty_status['max_usage']}s ({duty_status['percentage_used']:.1f}%)")
+    print(f"Remaining duty time: {duty_status['remaining_time']:.1f}s")
+    print(f"Total up time: {state['total_up_time']:.1f}s")
+    
+    # Always clean up GPIO
+    cleanup_gpio()
+    
+    return {
+        "success": True,
+        "movement": direction,
+        "start_height": current_height,
+        "end_height": target_height,
+        "distance": abs(delta),
+        "duration": actual_duration,
+        "duty_cycle": duty_status,
+        "total_up_time": state["total_up_time"]
+    }

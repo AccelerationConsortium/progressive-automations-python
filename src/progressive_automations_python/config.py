@@ -38,9 +38,9 @@ DUTY_CYCLE_PERIOD = 1200
 # Calculated as: DUTY_CYCLE_PERIOD * DUTY_CYCLE_PERCENTAGE
 DUTY_CYCLE_MAX_ON_TIME = 120  
 
-# Maximum continuous runtime in seconds (default: 30s)
+# Maximum continuous runtime in seconds (default: 45s)
 # This prevents single long movements from damaging the motor
-MAX_CONTINUOUS_RUNTIME = 30
+MAX_CONTINUOUS_RUNTIME = 45
 
 
 # =============================================================================

@@ -16,7 +16,7 @@ finally:
     del version, PackageNotFoundError
 
 # Export main API
-from progressive_automations_python.constants import (
+from progressive_automations_python.config import (
     LOWEST_HEIGHT,
     HIGHEST_HEIGHT,
     UP_RATE,
@@ -28,11 +28,6 @@ from progressive_automations_python.constants import (
 from progressive_automations_python.desk_controller import (
     move_to_height,
     check_duty_cycle_status_before_execution
-)
-
-from progressive_automations_python.testing import (
-    test_sequence,
-    execute_custom_movements
 )
 
 from progressive_automations_python.duty_cycle import (
@@ -54,10 +49,6 @@ from progressive_automations_python.deployment import (
     create_deployments
 )
 
-from progressive_automations_python.generate_movements import (
-    generate_duty_cycle_test_config
-)
-
 __all__ = [
     "__version__",
     "LOWEST_HEIGHT",
@@ -67,17 +58,12 @@ __all__ = [
     "UP_PIN",
     "DOWN_PIN",
     "move_to_height",
-    "test_sequence",
-    "execute_custom_movements",
     "check_duty_cycle_status_before_execution",
     "load_state",
     "save_state",
     "get_duty_cycle_status",
     "show_duty_cycle_status",
     "simple_movement_flow",
-    "custom_movements_flow",
-    "test_sequence_flow",
-    "duty_cycle_monitoring_flow",
-    "create_deployments",
-    "generate_duty_cycle_test_config"
+    "simple_movement_flow",
+    "create_deployments"
 ]
