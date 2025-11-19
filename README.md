@@ -16,7 +16,7 @@
 
 > Python package for programmatically controlling Progressive Automations desk lifters (e.g., LG-07 modular lifting column via FLTCON) with Prefect workflow orchestration.
 
-Control your desk lifter remotely via Prefect Cloud deployments with asynchronous execution and position polling. Perfect for laboratory automation where the desk position needs to be coordinated with other equipment.
+Control desk lifters remotely via Prefect Cloud deployments with asynchronous execution and position polling.
 
 ## Quick Start
 

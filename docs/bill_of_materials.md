@@ -1,6 +1,6 @@
 # Bill of Materials
 
-This document lists the parts used in the current Progressive Automations build. Quantities use the first number provided by the requester.
+Parts used in the current Progressive Automations build.
 
 | Part Number | Description | Quantity | Price |
 |-------------|-------------|:--------:|------:|
@@ -11,7 +11,5 @@ This document lists the parts used in the current Progressive Automations build.
 | [LG-07-3RM-32-440-HS-24V-B (black variant)](https://www.progressiveautomations.com/products/lg-07?variant=43102968447156) | 3 Stage Industrial Lifting Column - 32" Stroke - 440 lbs Force - Synchronizable - Anodic Oxide Black | 1 | 749.00 USD |
 
 Notes:
-- Quantities were taken from the first numeric field provided in the user's input.
-- All product links point to official Progressive Automations product pages (requested).
-- Prices shown were provided by the user (listed as of 11/6/2025).
-- If you want additional fields (supplier SKUs, unit cost breakdown, CSV/Excel export), tell me and I'll add them.
+- Product links point to official Progressive Automations product pages.
+- Prices listed as of 11/6/2025.

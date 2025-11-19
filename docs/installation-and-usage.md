@@ -104,7 +104,7 @@ progressive_automations_python --status
 
 ## Production Usage: Async Deployment and Position Polling
 
-**This is the primary way to use the desk lifter system.** Trigger movements asynchronously from external systems and poll their status later.
+Trigger movements asynchronously from external systems and poll their status later.
 
 ### Triggering Movements Asynchronously
 
@@ -169,9 +169,6 @@ import time
 async def wait_for_movement_completion(flow_run_id, check_interval=5, max_wait=300):
     """
     Poll until movement completes or timeout.
-    
-    This is similar to preheating an oven - you set the temperature and check later,
-    not sit in front of it the whole time.
     
     Args:
         flow_run_id: The flow run ID from run_deployment
@@ -438,14 +435,14 @@ This displays comprehensive code examples for:
 
 ## Next Steps
 
-1. ✅ Complete hardware setup per [Raspberry Pi Setup](raspberry-pi-setup.md)
-2. ✅ Install package: `pip install progressive-automations-python`
-3. ✅ Configure Prefect Cloud: `prefect cloud login -k <api-key>`
-4. ✅ Create work pool: `prefect work-pool create desk-lifter-pool --type process`
-5. ✅ Deploy flows via Python: `create_deployments("desk-lifter-pool")`
-6. ✅ Start worker: `prefect worker start --pool desk-lifter-pool`
-7. ✅ Test hardware (optional): `progressive_automations_python --test UP`
-8. ✅ **Trigger flows via `run_deployment()` from your automation code!**
+1. Complete hardware setup per [Raspberry Pi Setup](raspberry-pi-setup.md)
+2. Install package: `pip install progressive-automations-python`
+3. Configure Prefect Cloud: `prefect cloud login -k <api-key>`
+4. Create work pool: `prefect work-pool create desk-lifter-pool --type process`
+5. Deploy flows via Python: `create_deployments("desk-lifter-pool")`
+6. Start worker: `prefect worker start --pool desk-lifter-pool`
+7. Test hardware (optional): `progressive_automations_python --test UP`
+8. Trigger flows via `run_deployment()` from automation code
 
 For more information, see:
 - [Raspberry Pi Setup](raspberry-pi-setup.md)
