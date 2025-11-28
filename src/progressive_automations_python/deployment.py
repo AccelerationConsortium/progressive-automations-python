@@ -29,16 +29,15 @@ def create_deployments(work_pool_name: str = "desk-lifter-pool"):
     print(f"Creating deployment with work pool: {work_pool_name}")
     print("=== DEPLOYING DESK CONTROL FLOW ===")
     
-    # Deploy simple movement flow
-    simple_movement_flow.from_source(
-        source=str(source_dir.parent.parent),
-        entrypoint="progressive_automations_python/prefect_flows.py:simple_movement_flow",
-    ).deploy(
+    # Deploy simple movement flow using the installed package
+    deployment = simple_movement_flow.to_deployment(
         name="move-to-position",
         work_pool_name=work_pool_name,
         description="Move desk to a specific height position with duty cycle management"
     )
-    print(f"Deployed 'simple-movement-flow/move-to-position'")
+    
+    deployment_id = deployment.apply()
+    print(f"Deployed 'simple-movement-flow/move-to-position' with ID: {deployment_id}")
     
     print(f"\nDeployment created successfully.")
     print(f"\nNext steps:")
