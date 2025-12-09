@@ -23,13 +23,15 @@ def deploy_move_desk_flow(deployment_name: str = "move-desk"):
     
     # Create deployment using the correct API
     deployment = move_to_height.to_deployment(
-        name=deployment_name
+        name=deployment_name,
+        work_pool_name="desk-lifter-pool"
     )
     
     # Deploy it
     deployment_id = deployment.apply()
     
     print(f"✅ Deployment '{deployment_name}' created with ID: {deployment_id}")
+    print(f"Work pool: desk-lifter-pool")
     print(f"To run: prefect deployment run 'move-to-height/{deployment_name}' --param target_height=30")
     print(f"Parameter: target_height (float, in inches)")
     
