@@ -21,21 +21,32 @@ def deploy_move_desk_flow(deployment_name: str = "move-desk"):
         str: The deployment name for reference
     """
     
-    deployment = move_to_height(
-        source=".",
-        entrypoint="desk_controller.py:move_to_height",
-    ).deploy(
-        name=deployment_name,
-        work_pool_name="default-process-pool",
+    # Create deployment using the correct API
+    deployment = move_to_height.to_deployment(
+        name=deployment_name
     )
     
-    print(f"✅ Deployment '{deployment_name}' created!")
-    print(f"To run from Prefect Cloud: Use flow 'move-to-height/{deployment_name}'")
+    # Deploy it
+    deployment_id = deployment.apply()
+    
+    print(f"✅ Deployment '{deployment_name}' created with ID: {deployment_id}")
+    print(f"To run: prefect deployment run 'move-to-height/{deployment_name}' --param target_height=30")
     print(f"Parameter: target_height (float, in inches)")
     
     return deployment_name
 
 
 if __name__ == "__main__":
-    # Deploy when run directly
-    deploy_move_desk_flow()
+    import argparse
+    
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--deploy", action="store_true", help="Create deployment")
+    args = parser.parse_args()
+    
+    if args.deploy:
+        deploy_move_desk_flow()
+    else:
+        # Default: just test the flow directly
+        print("Testing flow directly with target height 30...")
+        result = move_to_height(30.0)
+        print(f"Result: {result}")
