@@ -1,53 +1,18 @@
 """
-Prefect flow deployment for desk lifter control.
+Prefect flow for desk lifter control.
 
-Imports the Prefect-decorated move_to_height flow from desk_controller and provides deployment utilities.
+Simple flow execution - just call the decorated function directly.
 """
 
 from progressive_automations_python.desk_controller import move_to_height
-
-
-# =============================================================================
-# DEPLOYMENT FUNCTION
-# =============================================================================
-
-def deploy_move_desk_flow(deployment_name: str = "move-desk"):
-    """Deploy the move desk flow for Prefect Cloud execution.
-    
-    Args:
-        deployment_name: Name for the deployment in Prefect Cloud
-    
-    Returns:
-        str: The deployment name for reference
-    """
-    
-    # Deploy using the modern flow.deploy() method
-    deployment_id = move_to_height.deploy(
-        name=deployment_name,
-        work_pool_name="desk-lifter-pool",
-        image=None,  # Use default image
-        push=False   # Don't push to registry
-    )
-    
-    print(f"✅ Deployment '{deployment_name}' created with ID: {deployment_id}")
-    print(f"Work pool: desk-lifter-pool")
-    print(f"To run: prefect deployment run 'move-to-height/{deployment_name}' --param target_height=30")
-    print(f"Parameter: target_height (float, in inches)")
-    
-    return deployment_name
-
 
 if __name__ == "__main__":
     import argparse
     
     parser = argparse.ArgumentParser()
-    parser.add_argument("--deploy", action="store_true", help="Create deployment")
+    parser.add_argument("--target-height", type=float, required=True, help="Target height in inches")
     args = parser.parse_args()
     
-    if args.deploy:
-        deploy_move_desk_flow()
-    else:
-        # Default: just test the flow directly
-        print("Testing flow directly with target height 30...")
-        result = move_to_height(30.0)
-        print(f"Result: {result}")
+    print(f"Running Prefect flow: move_to_height({args.target_height})")
+    result = move_to_height(args.target_height)
+    print(f"Flow result: {result}")
