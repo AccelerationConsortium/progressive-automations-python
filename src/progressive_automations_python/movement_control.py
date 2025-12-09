@@ -27,7 +27,7 @@ def release_up() -> None:
 
 def press_up() -> None:
     """Set UP pin to drive high (button pressed)"""
-    GPIO.setup(UP_PIN, GPIO.OUT, initial=GPIO.HIGH)
+    GPIO.setup(UP_PIN, GPIO.OUT, initial=GPIO.LOW)
 
 
 def release_down() -> None:
@@ -37,7 +37,7 @@ def release_down() -> None:
 
 def press_down() -> None:
     """Set DOWN pin to drive high (button pressed)"""
-    GPIO.setup(DOWN_PIN, GPIO.OUT, initial=GPIO.HIGH)
+    GPIO.setup(DOWN_PIN, GPIO.OUT, initial=GPIO.LOW)
 
 
 def cleanup_gpio() -> None:
