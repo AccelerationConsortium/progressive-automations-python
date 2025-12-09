@@ -9,7 +9,10 @@ import time
 from typing import Tuple
 
 import RPi.GPIO as GPIO
-from progressive_automations_python.config import UP_PIN, DOWN_PIN
+try:
+    from progressive_automations_python.config import UP_PIN, DOWN_PIN
+except ModuleNotFoundError:
+    from config import UP_PIN, DOWN_PIN
 
 
 def setup_gpio() -> None:
