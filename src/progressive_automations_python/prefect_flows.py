@@ -21,7 +21,7 @@ def deploy_move_desk_flow(deployment_name: str = "move-desk"):
         str: The deployment name for reference
     """
     
-    deployment = move_to_height.from_source(
+    deployment = move_to_height(
         source=".",
         entrypoint="desk_controller.py:move_to_height",
     ).deploy(
