@@ -166,3 +166,31 @@ def move_to_height(target_height: float) -> dict:
         "duty_cycle": duty_status,
         "total_up_time": state["total_up_time"]
     }
+
+
+if __name__ == "__main__":
+    import argparse
+    
+    parser = argparse.ArgumentParser(description="Desk height controller")
+    parser.add_argument("--target-height", type=float, required=True, 
+                       help="Target height in inches")
+    parser.add_argument("--status", action="store_true", 
+                       help="Show duty cycle status before execution")
+    args = parser.parse_args()
+    
+    try:
+        if args.status:
+            status = check_duty_cycle_status_before_execution()
+            print(f"\nCurrent position: {status.get('current_position', 'Unknown')}\"")
+        
+        print(f"\nMoving to target height: {args.target_height}\"")
+        result = move_to_height(args.target_height)
+        
+        if result["success"]:
+            print(f"✓ Movement successful!")
+            print(f"  Direction: {result['movement']}")
+            print(f"  Distance: {result['distance']:.2f}\"")
+            print(f"  Duration: {result['duration']:.1f}s")
+        
+    except Exception as e:
+        print(f"Error: {e}")
