@@ -5,6 +5,7 @@ Imports the Prefect-decorated move_to_height flow from desk_controller and provi
 """
 
 from progressive_automations_python.desk_controller import move_to_height
+from prefect.deployments import Deployment
 from prefect.runner.storage import GitRepository
 
 
@@ -23,7 +24,8 @@ def deploy_move_desk_flow(deployment_name: str = "move-desk"):
     """
     
     # Create deployment with Git source
-    deployment = move_to_height.to_deployment(
+    deployment = Deployment.build_from_flow(
+        flow=move_to_height,
         name=deployment_name,
         work_pool_name="desk-lifter-pool",
         storage=GitRepository(
