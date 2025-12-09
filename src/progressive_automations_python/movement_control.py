@@ -84,3 +84,28 @@ def move_down(down_time: float) -> Tuple[float, float, float]:
     
     print(f"DOWN movement completed: {actual_duration:.1f}s actual")
     return start_time, end_time, actual_duration
+
+
+if __name__ == "__main__":
+    # Simple CLI to call move_up/move_down directly without imports elsewhere.
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Direct GPIO movement test")
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument("--up", type=float, help="Move up for N seconds")
+    group.add_argument("--down", type=float, help="Move down for N seconds")
+    args = parser.parse_args()
+
+    setup_gpio()
+    try:
+        if args.up is not None:
+            print(f"Running move_up({args.up})")
+            start, end, dur = move_up(args.up)
+            print(f"Done. Duration: {dur:.3f}s")
+        else:
+            print(f"Running move_down({args.down})")
+            start, end, dur = move_down(args.down)
+            print(f"Done. Duration: {dur:.3f}s")
+    finally:
+        cleanup_gpio()
+        print("GPIO cleaned up")
