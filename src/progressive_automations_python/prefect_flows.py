@@ -28,7 +28,7 @@ def deploy_move_desk_flow(deployment_name: str = "move-desk"):
         work_pool_name="desk-lifter-pool",
         storage=GitRepository(
             url="https://github.com/AccelerationConsortium/progressive-automations-python.git",
-            reference="main"
+            branch="main"
         ),
         entrypoint="src/progressive_automations_python/desk_controller.py:move_to_height"
     )
