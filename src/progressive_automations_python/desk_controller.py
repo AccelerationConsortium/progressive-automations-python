@@ -6,6 +6,7 @@ Handles height calculations, movement planning, and state management.
 """
 
 from typing import Optional
+from prefect import flow
 from progressive_automations_python.config import (
     DUTY_CYCLE_MAX_ON_TIME,
     DUTY_CYCLE_PERIOD,
@@ -79,6 +80,7 @@ def check_duty_cycle_status_before_execution() -> dict:
     }
 
 
+@flow
 def move_to_height(target_height: float) -> dict:
     """
     Move desk to target height with safety checks and duty cycle enforcement
