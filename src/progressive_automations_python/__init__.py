@@ -38,11 +38,7 @@ from progressive_automations_python.duty_cycle import (
 )
 
 from progressive_automations_python.prefect_flows import (
-    simple_movement_flow,
-)
-
-from progressive_automations_python.deployment import (
-    create_deployments
+    deploy_move_desk_flow,
 )
 
 __all__ = [
@@ -59,6 +55,5 @@ __all__ = [
     "save_state",
     "get_duty_cycle_status",
     "show_duty_cycle_status",
-    "simple_movement_flow",
-    "create_deployments"
+    "deploy_move_desk_flow"
 ]
